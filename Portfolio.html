@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+<title>Imran Pasha — Drive my world</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="world.css?v=8"/>
+</head>
+<body>
+
+<div id="world"></div>
+
+<!-- Loader -->
+<div class="loader" id="loader">
+  <div class="logo">imran.</div>
+  <div class="bar"><i id="bar-fill"></i></div>
+  <div class="pct" id="pct">LOADING · 0%</div>
+</div>
+
+<!-- Start screen -->
+<div class="start" id="start">
+  <div class="scribble">hey,<br/>i'm <span class="pink">imran</span>.<br/><span class="cyan">drive</span> around<br/>my world!</div>
+  <div class="sub">full-stack engineer · cybersecurity</div>
+  <button class="play-btn" id="playBtn">▶ click to start</button>
+  <div class="hint">use WASD or arrow keys · R to reset · C for camera · SPACE to jump</div>
+</div>
+
+<!-- HUD -->
+<div class="hud" id="hud" style="display:none;">
+  <div class="hud-top">
+    <div class="brand">imran<span class="pink">.</span></div>
+    <div class="hire-banner" title="open mail to hire imran"><span class="dot"></span> Available for hire · <span class="pink">Q2 2026</span></div>
+    <div class="controls-card">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>E</kbd> interact · <kbd>L</kbd> fly</div>
+      <div><kbd>SPC</kbd> jump · <kbd>R</kbd> reset · <kbd>C</kbd>/<kbd>F</kbd> cam · <kbd>H</kbd> honk · <kbd>T</kbd> rain · <kbd>Y</kbd> time</div>
+    </div>
+  </div>
+  <div class="coin-hud">🪙 <span id="coinCount">0</span> / <span id="coinTotal">0</span></div>
+  <div class="speedo"><span class="num" id="speed">0</span><span class="unit">km/h</span></div>
+  <div class="toolbar">
+    <button id="liteBtn">lite mode</button>
+    <button id="muteBtn" title="mute (M)">🔊 sound</button>
+    <button id="hornBtn" title="honk (H)">📯 honk</button>
+    <button id="resetBtn">↺ reset</button>
+    <button id="camBtn">cam</button>
+  </div>
+  <div class="mobile-ctrl">
+    <div class="joystick"><div class="nub"></div></div>
+    <div class="btn-group">
+      <button class="btn-reset">↺</button>
+      <button class="btn-jump">JUMP</button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <!-- Cinematic intro overlay (shows during the 6-sec fly-over) -->
+  <div class="cinematic-overlay" id="cinematicOverlay">
+    <div class="cinematic-title">
+      <div class="cinematic-line cinematic-line-1">imran .</div>
+      <div class="cinematic-line cinematic-line-2">welcome to my world</div>
+      <div class="cinematic-line cinematic-line-3">drive · fly · explore</div>
+    </div>
+    <div class="cinematic-bars">
+      <div class="cinematic-bar cinematic-bar-top"></div>
+      <div class="cinematic-bar cinematic-bar-bot"></div>
+    </div>
+  </div>
+  <div class="minimap-wrap">
+    <div class="minimap-label">CITY MAP · click a pin to jump</div>
+    <canvas class="minimap" id="minimap" width="220" height="220"></canvas>
+  </div>
+</div>
+
+<!-- Zone panel -->
+<div class="zone-panel" id="zonePanel">
+  <button class="close" id="zoneClose">×</button>
+  <img class="photo" id="zonePhoto" alt="" src="" hidden/>
+  <div class="kicker" id="zoneKicker">/ zone</div>
+  <h2 id="zoneTitle">Title</h2>
+  <p id="zoneBody">Body</p>
+  <dl class="meta" id="zoneMeta"></dl>
+  <div class="actions" id="zoneActions"></div>
+</div>
+
+<!-- Three.js (ESM via importmap so we can use post-processing addons) + Cannon (UMD global) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from 'three';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+  window.THREE = THREE;
+  window.PP = { EffectComposer, RenderPass, UnrealBloomPass };
+  window.dispatchEvent(new Event('three-ready'));
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+<script>
+// Fake loader with quick progress
+let pct = 0;
+const bar = document.getElementById('bar-fill');
+const pctEl = document.getElementById('pct');
+const loader = document.getElementById('loader');
+const start = document.getElementById('start');
+const ld = setInterval(() => {
+  pct = Math.min(100, pct + 6 + Math.random() * 10);
+  bar.style.width = pct + '%';
+  pctEl.textContent = 'LOADING · ' + Math.round(pct) + '%';
+  if (pct >= 100) { clearInterval(ld); setTimeout(() => loader.classList.add('hidden'), 400); }
+}, 80);
+</script>
+
+<script src="world.js?v=27"></script>
+
+<script>
+// Start handler
+const playBtn = document.getElementById('playBtn');
+const hud = document.getElementById('hud');
+playBtn.addEventListener('click', () => {
+  if (window.imranSound) { window.imranSound.unlock(); window.imranSound.click(); }
+  start.classList.add('hidden');
+  hud.style.display = 'block';
+  // Set a sticky flag so world.js can pick it up even if it boots AFTER this click
+  // (race: Three.js ESM module may still be loading when user clicks play).
+  window.__imranStartRequested = true;
+  window.dispatchEvent(new Event('imran:start'));
+});
+
+// Speed HUD
+const speedEl = document.getElementById('speed');
+window.addEventListener('imran:speed', (e) => {
+  speedEl.textContent = Math.round(e.detail * 3.6);
+});
+
+// Coin counter
+const coinCountEl = document.getElementById('coinCount');
+const coinTotalEl = document.getElementById('coinTotal');
+window.addEventListener('imran:coin', (e) => {
+  coinCountEl.textContent = e.detail.collected;
+  coinTotalEl.textContent = e.detail.total;
+  if (e.detail.collected === e.detail.total) {
+    showToast('🏆 ALL COINS COLLECTED!');
+  } else {
+    showToast(`🪙 +1 coin · <span class="pink">${e.detail.collected}/${e.detail.total}</span>`);
+  }
+});
+
+// Generic toast pipe (used by plane/rain/time-cycle from world.js)
+window.addEventListener('imran:toast', (e) => showToast(e.detail));
+
+// Cinematic intro overlay
+const cinematicOverlay = document.getElementById('cinematicOverlay');
+window.addEventListener('imran:cinematic:start', () => {
+  cinematicOverlay.classList.add('show');
+});
+window.addEventListener('imran:cinematic:end', () => {
+  cinematicOverlay.classList.remove('show');
+});
+
+// Hire-me banner click → mailto
+document.querySelector('.hire-banner').addEventListener('click', () => {
+  if (window.imranSound) window.imranSound.click();
+  window.location.href = 'mailto:imranpasha.ahmed@gmail.com?subject=Let%27s%20build%20something';
+});
+
+// Toolbar
+const liteBtn = document.getElementById('liteBtn');
+let lite = false;
+liteBtn.addEventListener('click', () => {
+  lite = !lite;
+  liteBtn.classList.toggle('active', lite);
+  if (window.imranSound) window.imranSound.click();
+  window.dispatchEvent(new CustomEvent('imran:lite', { detail: lite }));
+});
+const muteBtn = document.getElementById('muteBtn');
+let muted = false;
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  muteBtn.classList.toggle('active', muted);
+  muteBtn.textContent = muted ? '🔇 muted' : '🔊 sound';
+  if (window.imranSound) window.imranSound.setMuted(muted);
+});
+document.getElementById('hornBtn').addEventListener('click', () => {
+  if (window.imranSound) window.imranSound.honk();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (window.imranSound) window.imranSound.click();
+  window.dispatchEvent(new Event('imran:reset'));
+});
+document.getElementById('camBtn').addEventListener('click', () => {
+  if (window.imranSound) window.imranSound.click();
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC' }));
+});
+
+// Global mute via M key
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM' && !e.repeat) muteBtn.click();
+});
+
+// Zone panel
+const panel = document.getElementById('zonePanel');
+const zoneTitle = document.getElementById('zoneTitle');
+const zoneKicker = document.getElementById('zoneKicker');
+const zoneBody = document.getElementById('zoneBody');
+const zoneMeta = document.getElementById('zoneMeta');
+const zoneActions = document.getElementById('zoneActions');
+const toast = document.getElementById('toast');
+let toastT;
+
+function showToast(msg) {
+  toast.innerHTML = msg;
+  toast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+const zonePhoto = document.getElementById('zonePhoto');
+function setPhoto(src) {
+  if (src) { zonePhoto.src = src; zonePhoto.hidden = false; }
+  else { zonePhoto.hidden = true; zonePhoto.src = ''; }
+}
+
+function showPanel(z) {
+  if (!z) { panel.classList.remove('show'); setPhoto(null); return; }
+  zoneActions.innerHTML = '';
+  zoneMeta.innerHTML = '';
+  setPhoto(null);
+  if (z.key === 'about') {
+    setPhoto('assets/imran.jpeg');
+    zoneKicker.textContent = '/ about';
+    zoneTitle.textContent = 'hey, I\'m Imran 👋';
+    zoneBody.textContent = 'I\'m a full-stack engineer & ethical hacker from Bangalore. I build MERN apps, native Android, online judges, and break things on weekends. Drive around — knock the skill pins, hit ramps, find my projects.';
+    const meta = { Role: 'Full-stack · Cybersec', Stack: 'MERN · GraphQL · Java · Python', Status: 'Available Q2 2026', Base: 'Bangalore, IN' };
+    Object.entries(meta).forEach(([k,v]) => { zoneMeta.innerHTML += `<dt>${k}</dt><dd>${v}</dd>`; });
+    zoneActions.innerHTML = `<a class="btn primary" href="mailto:imranpasha.ahmed@gmail.com">say hi</a><a class="btn ghost" href="https://github.com/Imranpasha30" target="_blank">github</a><a class="btn ghost" href="assets/resume.pdf" download>resume ↓</a>`;
+    panel.classList.add('show');
+  } else if (z.key === 'contact') {
+    zoneKicker.textContent = '/ mailbox';
+    zoneTitle.textContent = 'send me a postcard';
+    zoneBody.textContent = 'Drop a line — for collabs, security audits, or just to say hi.';
+    zoneMeta.innerHTML = `<dt>Email</dt><dd>imranpasha.ahmed@gmail.com</dd><dt>Mode</dt><dd>open Q2 2026</dd>`;
+    zoneActions.innerHTML = `<a class="btn primary" href="mailto:imranpasha.ahmed@gmail.com">open mail</a><a class="btn ghost" href="assets/resume.pdf" download>resume ↓</a>`;
+    panel.classList.add('show');
+  } else if (z.key === 'skills') {
+    zoneKicker.textContent = '/ skills';
+    zoneTitle.textContent = 'tech stack';
+    zoneBody.textContent = 'Drive the icons to knock them around. Hit "view all" for the full taxonomy across languages, frontend, backend, devops, security, and more.';
+    // Render the full skill list grouped by category (data exposed by world.js)
+    const sk = window.imranSkills || {};
+    let html = '';
+    for (const [cat, list] of Object.entries(sk)) {
+      html += `<dt>${cat}</dt><dd>${list.join(' &middot; ')}</dd>`;
+    }
+    zoneMeta.innerHTML = html;
+    zoneActions.innerHTML = `<button class="btn primary" id="closeSkills">close</button>`;
+    panel.classList.add('show');
+    // Auto-wire close
+    setTimeout(() => {
+      const cs = document.getElementById('closeSkills');
+      if (cs) cs.addEventListener('click', () => panel.classList.remove('show'));
+    }, 0);
+    showToast('💥 <span class="pink">SKILLS</span> — knock the icons!');
+  } else if (z.key === 'projects') {
+    // Single rotating billboard — show cycling controls
+    showInteractPrompt(`📂 <span class="pink">PROJECTS</span> — <kbd>P</kbd> prev · <kbd>N</kbd> next · <kbd>E</kbd> open`);
+  } else if (z.key && z.key.startsWith('project_')) {
+    const p = z.project;
+    activeInteractUrl = p.url;
+    activeInteractLabel = p.name;
+    showInteractPrompt(`📂 <span class="pink">${p.name}</span> — press <kbd>E</kbd> to open repo`);
+  } else if (z.key && z.key.startsWith('social_')) {
+    const s = z.social;
+    activeInteractUrl = s.url;
+    activeInteractLabel = s.name;
+    showInteractPrompt(`🔗 <span class="pink">${s.name}</span> — press <kbd>E</kbd> to open`);
+  }
+}
+window.addEventListener('imran:zone', (e) => showPanel(e.detail));
+document.getElementById('zoneClose').addEventListener('click', () => panel.classList.remove('show'));
+
+// Press-E interact system: when in a project or social zone, E opens the URL.
+let activeInteractUrl = null;
+let activeInteractLabel = null;
+const interactEl = document.createElement('div');
+interactEl.className = 'interact-prompt';
+document.body.appendChild(interactEl);
+function showInteractPrompt(html) {
+  interactEl.innerHTML = html;
+  interactEl.classList.add('show');
+}
+function hideInteractPrompt() {
+  interactEl.classList.remove('show');
+  activeInteractUrl = null;
+  activeInteractLabel = null;
+}
+// Hide prompt and clear active URL on zone exit (z === null)
+window.addEventListener('imran:zone', (e) => {
+  if (!e.detail) hideInteractPrompt();
+});
+window.addEventListener('imran:interact', () => {
+  if (activeInteractUrl) {
+    if (window.imranSound) window.imranSound.click();
+    window.open(activeInteractUrl, '_blank');
+    showToast(`✨ opening <span class="pink">${activeInteractLabel}</span>`);
+  }
+});
+
+// ────────── MINIMAP (draw every ~100ms — checkpoints + car position) ──────────
+(function () {
+  const mm = document.getElementById('minimap');
+  if (!mm) return;
+  const ctx = mm.getContext('2d');
+  const W = mm.width, H = mm.height;
+  // World extents — covers everything from civil engineer plan (~ -100 to +100)
+  const WR = 100;
+  // World coord → minimap pixel
+  const wx2px = (wx) => (wx + WR) * (W / (WR * 2));
+  const wz2py = (wz) => (wz + WR) * (H / (WR * 2));
+  // River path mirrors the one in world.js
+  const RIVER_PATH = [[85, 60], [70, 35], [55, 10], [50, -15], [60, -40], [70, -55]];
+
+  function colorForZone(key) {
+    if (key === 'about')                 return '#5CE5FF';
+    if (key === 'projects')              return '#FF3E8A';
+    if (key === 'skills')                return '#8A3EFF';
+    if (key === 'contact')               return '#FFE066';
+    if (key && key.startsWith('social_'))return '#C1FF12';
+    return '#FFE066';
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    // Cream-paper background
+    ctx.fillStyle = 'rgba(255, 247, 235, 0.85)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Road grid hints (faint)
+    ctx.strokeStyle = 'rgba(122, 74, 40, 0.15)';
+    ctx.lineWidth = 1;
+    for (const r of [-32, -22, -12, 0, 12, 22, 32]) {
+      const m = wx2px(r);
+      ctx.beginPath(); ctx.moveTo(m, 0); ctx.lineTo(m, H); ctx.stroke();
+      const my = wz2py(r);
+      ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(W, my); ctx.stroke();
+    }
+
+    // River
+    ctx.strokeStyle = '#5CE5FF';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    RIVER_PATH.forEach(([x, z], i) => {
+      const px = wx2px(x), py = wz2py(z);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+    // Lake circle
+    ctx.fillStyle = 'rgba(92, 229, 255, 0.55)';
+    ctx.beginPath(); ctx.arc(wx2px(72), wz2py(-65), wx2px(20) - wx2px(0), 0, Math.PI*2); ctx.fill();
+
+    // Park
+    ctx.fillStyle = 'rgba(123, 192, 74, 0.55)';
+    ctx.beginPath(); ctx.arc(wx2px(-65), wz2py(-55), 8, 0, Math.PI*2); ctx.fill();
+
+    // Tower marker
+    ctx.fillStyle = '#3E2418';
+    ctx.beginPath(); ctx.arc(wx2px(85), wz2py(65), 3, 0, Math.PI*2); ctx.fill();
+
+    // Zones (interactive checkpoints)
+    let pins = [];
+    if (window.imranWorld) {
+      const zones = window.imranWorld.getZones();
+      for (const z of zones) {
+        const px = wx2px(z.x), py = wz2py(z.z);
+        const color = colorForZone(z.key);
+        // Pin shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.arc(px, py + 1, 6, 0, Math.PI*2); ctx.fill();
+        // Pin body
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#3E2418';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        pins.push({ px, py, x: z.x, z: z.z, key: z.key, label: z.label });
+      }
+      // Car (triangle pointing in yaw direction)
+      const cp = window.imranWorld.getCarPos();
+      const cy = window.imranWorld.getCarYaw();
+      const cx = wx2px(cp.x), cyp = wz2py(cp.z);
+      ctx.save();
+      ctx.translate(cx, cyp);
+      ctx.rotate(cy + Math.PI);   // visual: triangle points "forward" relative to driving dir
+      ctx.fillStyle = '#FF3E8A';
+      ctx.strokeStyle = '#3E2418';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo(6, 6);
+      ctx.lineTo(-6, 6);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    mm._pins = pins;
+  }
+  setInterval(draw, 120);
+
+  // Click to teleport
+  mm.addEventListener('click', (e) => {
+    if (!window.imranWorld) return;
+    const rect = mm.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * (W / rect.width);
+    const cy = (e.clientY - rect.top) * (H / rect.height);
+    const pins = mm._pins || [];
+    let best = null, bestD = 22;   // 22 px max click distance
+    for (const p of pins) {
+      const d = Math.hypot(cx - p.px, cy - p.py);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) {
+      // Teleport slightly in front of the zone so the car drives ONTO the pad
+      window.imranWorld.teleport(best.x, best.z);
+      showToast(`🚀 jumped to <span class="pink">${best.label || best.key}</span>`);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
