@@ -1,31 +1,29 @@
-# Caddyfile used INSIDE the Docker stack.
-# Different from local dev: it routes to service hostnames `web` and `mp`
-# (Docker network DNS) instead of `localhost`.
+# Caddyfile used INSIDE the Docker stack with a DuckDNS subdomain.
+# Routes to Docker network hostnames `web` and `mp` (NOT localhost).
 #
-# To switch to a real domain:
-#   1. Replace `:80` with your domain (e.g. `imranpasha.dev`)
-#   2. Caddy auto-issues + renews a Let's Encrypt cert (requires DNS A-record
-#      pointed at this server, ports 80 + 443 open in the EC2 security group)
+# Caddy automatically:
+#   1. Listens on both port 80 and 443
+#   2. Issues a real Let's Encrypt cert for the domain below (no manual certbot)
+#   3. Renews the cert ~30 days before expiry, forever
+#   4. Redirects HTTP → HTTPS by default
+#
+# REPLACE imranportfolio.duckdns.org BELOW with your actual DuckDNS subdomain.
 
-# ─── DOMAIN MODE — uncomment + edit when ready ───
-# yourdomain.com {
-#     encode gzip
-#     handle /ws* {
-#         reverse_proxy mp:5182
-#     }
-#     reverse_proxy web:5181
-#     header {
-#         Strict-Transport-Security "max-age=31536000;"
-#         X-Content-Type-Options "nosniff"
-#         Referrer-Policy "strict-origin-when-cross-origin"
-#     }
-# }
-
-# ─── IP-ONLY MODE (HTTP only, no AR/voice/microphone) ───
-:80 {
+imranportfolio.duckdns.org {
     encode gzip
+
+    # WebSocket upgrade for multiplayer
     handle /ws* {
         reverse_proxy mp:5182
     }
+
+    # Everything else → web service (static files + chat proxy)
     reverse_proxy web:5181
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000;"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
 }
