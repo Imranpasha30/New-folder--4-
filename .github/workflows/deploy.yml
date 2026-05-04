@@ -103,11 +103,18 @@ jobs:
           # Auth to GHCR (needed if your package visibility is private)
           echo "$GHCR_PAT" | sudo docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
+          # Write env vars to .env file — docker compose auto-reads this from CWD.
+          # This avoids "sudo strips environment" issues.
+          umask 077
+          cat > .env <<ENVEOF
+          GHCR_IMAGE=${GHCR_IMAGE}
+          GEMINI_KEY=${GEMINI_KEY}
+          ENVEOF
+          chmod 600 .env
+
           # Pull the new image and bring up the stack with zero downtime
-          export GEMINI_KEY="$GEMINI_KEY"
-          export GHCR_IMAGE="$GHCR_IMAGE"
-          sudo -E docker compose pull
-          sudo -E docker compose up -d --remove-orphans
+          sudo docker compose pull
+          sudo docker compose up -d --remove-orphans
 
           # Show running containers
           sudo docker compose ps
