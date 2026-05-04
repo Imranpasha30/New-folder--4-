@@ -11,7 +11,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  # Fixed image name — independent of repo name (some repo names like "New folder (4)"
+  # produce invalid Docker tags after URL-encoding).
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/portfolio
 
 jobs:
   build-and-deploy:
