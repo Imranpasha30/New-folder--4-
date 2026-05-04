@@ -116,6 +116,10 @@ jobs:
           sudo docker compose pull
           sudo docker compose up -d --remove-orphans
 
+          # Force-restart Caddy on every deploy so it always picks up Caddyfile.docker
+          # changes (bind-mounted file changes don't trigger a container restart by default).
+          sudo docker compose restart caddy
+
           # Show running containers
           sudo docker compose ps
 
