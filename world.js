@@ -232,7 +232,7 @@
 
   // ─────────────── BOOT ───────────────
   const container = document.getElementById('world');
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
   // Cap pixel ratio at 1.5 — caps GPU work on retina/4K (was 2 = 4x more pixels)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -517,6 +517,271 @@
   planeGroup.add(planeTail);
   scene.add(planeGroup);
   planeGroup.visible = false;
+
+  // ─────────────── HOT AIR BALLOON (drifts slowly across sky) ───────────────
+  const balloonGroup = new THREE.Group();
+  // Stripes of colorful bands
+  const balloonColors = [0xff3e8a, 0xffe066, 0x5ce5ff, 0xff3e8a, 0xffe066];
+  for (let i = 0; i < balloonColors.length; i++) {
+    const band = new THREE.Mesh(
+      new THREE.SphereGeometry(2.5, 16, 8, 0, Math.PI * 2, i * Math.PI / 5, Math.PI / 5),
+      new THREE.MeshStandardMaterial({ color: balloonColors[i], roughness: 0.7, emissive: balloonColors[i], emissiveIntensity: 0.15 })
+    );
+    balloonGroup.add(band);
+  }
+  // Ropes
+  for (const dx of [-1, 1]) for (const dz of [-1, 1]) {
+    const rope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 2.2, 4),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+    );
+    rope.position.set(dx * 0.6, -3.2, dz * 0.6);
+    balloonGroup.add(rope);
+  }
+  // Basket
+  const basket = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.8, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.85 })
+  );
+  basket.position.y = -4.4;
+  balloonGroup.add(basket);
+  balloonGroup.position.set(-90, 35, -40);
+  scene.add(balloonGroup);
+  // Soft glow around balloon for visibility
+  const balloonLight = new THREE.PointLight(0xffe066, 0.5, 10, 2);
+  balloonLight.position.copy(balloonGroup.position);
+  scene.add(balloonLight);
+
+  // ─────────────── BIRDS (V-formation periodically) ───────────────
+  const birdsGroup = new THREE.Group();
+  const birdMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const birds = [];
+  for (let i = 0; i < 6; i++) {
+    const bird = new THREE.Mesh(
+      new THREE.ConeGeometry(0.25, 0.7, 4),
+      birdMat
+    );
+    bird.rotation.x = Math.PI / 2;
+    birdsGroup.add(bird);
+    // V-formation offsets: leader at index 0, others spread out behind
+    const slot = Math.ceil(i / 2);
+    const side = i % 2 === 0 ? -1 : 1;
+    birds.push({ mesh: bird, ox: side * slot * 1.5, oz: slot * 1.4 });
+  }
+  scene.add(birdsGroup);
+  birdsGroup.visible = false;
+  let birdsTimer = 25;     // first appearance after 25s
+  let birdsProgress = 0;
+
+  // ─────────────── PET DOG NPC (follows car when nearby) ───────────────
+  const dogGroup = new THREE.Group();
+  const dogBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 0.4, 1.0),
+    new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.7 })
+  );
+  dogBody.position.y = 0.45;
+  dogBody.castShadow = true;
+  dogGroup.add(dogBody);
+  const dogHead = new THREE.Mesh(
+    new THREE.BoxGeometry(0.45, 0.4, 0.45),
+    new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.7 })
+  );
+  dogHead.position.set(0, 0.65, -0.55);
+  dogGroup.add(dogHead);
+  const dogEar1 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.18, 0.08), new THREE.MeshStandardMaterial({ color: 0x6a4018 }));
+  dogEar1.position.set(-0.18, 0.85, -0.55); dogGroup.add(dogEar1);
+  const dogEar2 = dogEar1.clone(); dogEar2.position.x = 0.18; dogGroup.add(dogEar2);
+  const dogTail = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.1, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x6a4018 })
+  );
+  dogTail.position.set(0, 0.55, 0.55);
+  dogGroup.add(dogTail);
+  dogGroup.position.set(-58, 0, -50);    // starts in the park
+  scene.add(dogGroup);
+  let dogTarget = { x: -58, z: -50 };
+  let dogState = 'wander';                 // 'wander' | 'follow'
+
+  // ─────────────── HIDDEN BUNKER EASTER EGG ───────────────
+  // Hold E for 3 seconds at (-30, 50) near the HTB skull → camera dips below ground,
+  // reveals a small dark room with a CRT terminal showing scrolling code.
+  const bunkerGroup = new THREE.Group();
+  bunkerGroup.position.set(-30, -8, 50);   // 8m below ground
+  // Floor
+  const bFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 0.3, 8),
+    new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.9 })
+  );
+  bFloor.position.y = 0;
+  bunkerGroup.add(bFloor);
+  // Walls (4 sides)
+  for (const [w, d, ox, oz] of [[8, 0.2, 0, -4], [8, 0.2, 0, 4], [0.2, 8, -4, 0], [0.2, 8, 4, 0]]) {
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(w, 4, d),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9, emissive: 0x002200, emissiveIntensity: 0.2 })
+    );
+    wall.position.set(ox, 2, oz);
+    bunkerGroup.add(wall);
+  }
+  // Ceiling
+  const bCeil = new THREE.Mesh(
+    new THREE.BoxGeometry(8, 0.3, 8),
+    new THREE.MeshStandardMaterial({ color: 0x111 })
+  );
+  bCeil.position.y = 4;
+  bunkerGroup.add(bCeil);
+  // CRT terminal screen (back wall, glowing green)
+  const crtCanvas = document.createElement('canvas');
+  crtCanvas.width = 512; crtCanvas.height = 256;
+  const crtCtx = crtCanvas.getContext('2d');
+  const crtTex = new THREE.CanvasTexture(crtCanvas);
+  crtTex.colorSpace = THREE.SRGBColorSpace;
+  const crtScreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.5, 1.8),
+    new THREE.MeshBasicMaterial({ map: crtTex, emissive: 0x00ff00, emissiveIntensity: 0.5 })
+  );
+  crtScreen.position.set(0, 2.2, -3.85);
+  bunkerGroup.add(crtScreen);
+  const crtLight = new THREE.PointLight(0x00ff00, 1.0, 8, 2);
+  crtLight.position.set(0, 2, -2);
+  bunkerGroup.add(crtLight);
+  // Code lines (will be animated to scroll)
+  const crtLines = [
+    'root@imran:~$ nmap -sV target.io',
+    'PORT     STATE  SERVICE',
+    '22/tcp   open   ssh OpenSSH 8.2',
+    '443/tcp  open   https nginx 1.18',
+    '8080/tcp open   http-proxy',
+    'root@imran:~$ sudo ./escalate.sh',
+    '[+] kernel exploit landed',
+    '[+] root shell obtained ✓',
+    'root@imran:~# whoami',
+    'root',
+    'root@imran:~# cat /etc/shadow',
+    'root:$6$rounds=...',
+    'root@imran:~# echo "owned" > flag.txt',
+    'root@imran:~# nc -lvp 4444',
+    'listening on [any] 4444 ...',
+  ];
+  let crtScroll = 0;
+  function drawCrt() {
+    crtCtx.fillStyle = '#001100';
+    crtCtx.fillRect(0, 0, 512, 256);
+    crtCtx.fillStyle = '#00ff66';
+    crtCtx.font = '14px "JetBrains Mono", monospace';
+    crtCtx.shadowColor = '#00ff66';
+    crtCtx.shadowBlur = 4;
+    for (let i = 0; i < 14; i++) {
+      const lineIdx = (Math.floor(crtScroll) + i) % crtLines.length;
+      crtCtx.fillText(crtLines[lineIdx], 10, 20 + i * 17);
+    }
+    crtTex.needsUpdate = true;
+  }
+  drawCrt();
+  scene.add(bunkerGroup);
+  // State
+  let bunkerProgress = 0;             // 0..3 sec hold time at trigger spot
+  let bunkerActive = false;
+  const BUNKER_TRIGGER = { x: -30, z: 50, radius: 3 };
+
+  // ─────────────── REFLECTIVE LAKE WATER (faux reflection via mirror plane) ───────────────
+  // Note: Real Reflector requires extra render passes which slow things down.
+  // Faux version: a shiny semi-transparent plane on top of the existing lake
+  // so it picks up the sky color and feels reflective.
+  const lakeShine = new THREE.Mesh(
+    new THREE.CircleGeometry(20, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0xb8e6ff, transparent: true, opacity: 0.35,
+      roughness: 0.05, metalness: 0.95,
+      emissive: 0x88ccff, emissiveIntensity: 0.15,
+    })
+  );
+  lakeShine.rotation.x = -Math.PI/2;
+  lakeShine.position.set(72, 0.10, -65);
+  scene.add(lakeShine);
+
+  // ─────────────── ACHIEVEMENTS ───────────────
+  // 8 achievements tracked locally, persisted in localStorage. Unlocking fires a toast.
+  const ACHIEVEMENT_LIST = [
+    { id: 'first_drive',   icon: '🚗', text: 'Welcome — your first drive!',     check: (s) => s.distance > 5 },
+    { id: 'speed_demon',   icon: '⚡', text: 'Speed Demon — top 20 m/s reached', check: (s) => s.topSpeed >= 20 },
+    { id: 'all_coins',     icon: '🪙', text: 'Treasure Hunter — all coins!',    check: (s) => s.coins === 28 },
+    { id: 'visited_all',   icon: '🗺', text: 'Tour Guide — visited every zone', check: (s) => s.zonesVisited.size >= 7 },
+    { id: 'pinball',       icon: '💥', text: 'Pinball — knocked a skill cube',  check: (s) => s.skillKnocks > 0 },
+    { id: 'aviator',       icon: '✈', text: 'Aviator — entered plane mode',     check: (s) => s.flewOnce },
+    { id: 'drift_king',    icon: '🌀', text: 'Drift King — 3 sec sustained drift', check: (s) => s.driftTime >= 3 },
+    { id: 'easter_hunter', icon: '🥚', text: 'Easter Hunter — found the bunker', check: (s) => s.foundBunker },
+  ];
+  const achievements = (function loadAchievements() {
+    try { return new Set(JSON.parse(localStorage.getItem('imranAchievements') || '[]')); }
+    catch (e) { return new Set(); }
+  })();
+  const stats = {
+    distance: 0, topSpeed: 0, coins: 0, zonesVisited: new Set(),
+    skillKnocks: 0, flewOnce: false, driftTime: 0, foundBunker: false,
+  };
+  function checkAchievements() {
+    for (const a of ACHIEVEMENT_LIST) {
+      if (!achievements.has(a.id) && a.check(stats)) {
+        achievements.add(a.id);
+        try { localStorage.setItem('imranAchievements', JSON.stringify([...achievements])); } catch (e) {}
+        if (window.__imranToast) window.__imranToast(`🏆 ${a.icon} ${a.text}`);
+      }
+    }
+  }
+  // Expose for HTML achievements panel
+  window.imranAchievements = { list: ACHIEVEMENT_LIST, unlocked: achievements, stats };
+
+  // ─────────────── COIN NITRO BOOST (Shift = burn collected coins for speed) ───────────────
+  let nitroFuel = 0;             // increments by 1 per coin (max 6)
+  let nitroActive = false;
+  let nitroTimer = 0;
+  function activateNitro() {
+    if (nitroFuel <= 0 || nitroActive) return;
+    nitroActive = true;
+    nitroTimer = 3.0;
+    nitroFuel--;
+    if (window.__imranToast) window.__imranToast(`⚡ NITRO BOOST ×${nitroFuel} left`);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') activateNitro();
+  });
+  // Listen for coin collection to refill nitro
+  window.addEventListener('imran:coin', (e) => {
+    nitroFuel = Math.min(6, nitroFuel + 1);
+  });
+
+  // ─────────────── DRIFT SCORING ───────────────
+  let driftActive = false;
+  let driftDuration = 0;
+  let driftScore = 0;
+  let totalDriftScore = 0;
+
+  // ─────────────── TIME TRIAL MODE ───────────────
+  let trialActive = false;
+  let trialStart = 0;
+  let trialBest = parseFloat(localStorage.getItem('imranTrialBest') || '999');
+  function startTrial() {
+    if (trialActive) return;
+    trialActive = true;
+    trialStart = performance.now();
+    if (window.__imranToast) window.__imranToast('⏱ TIME TRIAL — visit all zones, fastest wins');
+  }
+  function endTrial() {
+    if (!trialActive) return;
+    trialActive = false;
+    const elapsed = (performance.now() - trialStart) / 1000;
+    const best = elapsed < trialBest;
+    if (best) { trialBest = elapsed; try { localStorage.setItem('imranTrialBest', elapsed); } catch(e) {} }
+    const medal = elapsed < 30 ? '🥇' : elapsed < 60 ? '🥈' : elapsed < 90 ? '🥉' : '🏁';
+    if (window.__imranToast) window.__imranToast(`${medal} ${elapsed.toFixed(1)}s${best ? ' — NEW BEST!' : ''}`);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyZ') {                     // Z = toggle time trial
+      if (trialActive) endTrial(); else startTrial();
+    }
+  });
 
   // Banner trail — pre-allocated Points pool that the plane drops behind itself
   const TRAIL_MAX = 120;
@@ -1820,7 +2085,16 @@
     'ArrowRight': 'r', 'KeyD': 'r',
     'Space': 'jump',
   };
+  // If the user is typing in an input/textarea (e.g. the chat box), let the keys
+  // pass through to that field instead of triggering the car controls.
+  function isTyping(e) {
+    const el = e.target;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+  }
   window.addEventListener('keydown', (e) => {
+    if (isTyping(e)) return;
     if (keyMap[e.code]) {
       keys[keyMap[e.code]] = true;
       e.preventDefault();
@@ -1839,6 +2113,7 @@
       window.__imranProjectCycle(-1);
     }
     if (e.code === 'KeyE' || e.code === 'Enter') {
+      window.__imranEHeld = true;            // for bunker easter-egg hold detection
       // If on the projects pad, open the currently displayed project
       if (activeZone && activeZone.key === 'projects') {
         window.__imranProjectOpen();
@@ -1847,11 +2122,16 @@
       }
     }
   });
-  window.addEventListener('keyup', (e) => { 
-    if (keyMap[e.code]) { 
-      keys[keyMap[e.code]] = false; 
-      e.preventDefault(); 
-    } 
+  window.addEventListener('keyup', (e) => {
+    if (isTyping(e)) return;
+    if (e.code === 'KeyE' || e.code === 'Enter') window.__imranEHeld = false;
+  });
+  window.addEventListener('keyup', (e) => {
+    if (isTyping(e)) return;
+    if (keyMap[e.code]) {
+      keys[keyMap[e.code]] = false;
+      e.preventDefault();
+    }
   });
 
   // ─────────────── MOUSE ORBIT (Blender-style hold + drag) ───────────────
@@ -2000,6 +2280,63 @@
     carGroup.quaternion.copy(chassis.quaternion);
     return { speed: flySpeed, throttle: thrust };
   }
+
+  // ─────────────── REMOTE PLAYERS (multiplayer ghost cars) ───────────────
+  const remotePlayers = new Map();   // id → { mesh, lastSeen }
+  function makeRemoteCar(color = 0x5ce5ff) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(2.0, 0.6, 4.0),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, wireframe: true })
+    );
+    body.position.y = 0.5;
+    g.add(body);
+    const top = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.5, 1.8),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, wireframe: true })
+    );
+    top.position.set(0, 1.05, 0.2);
+    g.add(top);
+    return g;
+  }
+  function setRemotePlayers(playerList) {
+    const seen = new Set();
+    const palette = [0xff3e8a, 0x5ce5ff, 0x8a3eff, 0xffe066, 0xc1ff12, 0xff9b3e];
+    for (const p of playerList) {
+      seen.add(p.id);
+      let entry = remotePlayers.get(p.id);
+      if (!entry) {
+        const c = palette[Math.floor(p.id * 9301 % palette.length)];
+        const mesh = makeRemoteCar(c);
+        scene.add(mesh);
+        entry = { mesh, lastSeen: 0 };
+        remotePlayers.set(p.id, entry);
+      }
+      entry.mesh.position.set(p.x, 0.5, p.z);
+      entry.mesh.rotation.y = p.yaw || 0;
+      entry.lastSeen = performance.now();
+    }
+    // Remove peers that disappeared
+    for (const [id, entry] of remotePlayers) {
+      if (!seen.has(id)) {
+        scene.remove(entry.mesh);
+        remotePlayers.delete(id);
+      }
+    }
+  }
+
+  // ─────────────── XR (AR) ENTRY POINT ───────────────
+  function enterAR(session) {
+    renderer.xr.enabled = true;
+    renderer.xr.setSession(session);
+    // Scale world to coffee-table size when in AR
+    scene.scale.set(0.05, 0.05, 0.05);
+    session.addEventListener('end', () => {
+      scene.scale.set(1, 1, 1);
+      renderer.xr.enabled = false;
+    });
+  }
+  window.imranXR = { enterAR, setRemotePlayers };
 
   // ─────────────── PUBLIC WORLD API (for minimap + UI integration) ───────────────
   window.imranWorld = {
@@ -2346,6 +2683,70 @@
 
   // ─ ABOUT ZONE (Downtown anchor — civil engineer plan)
   addZonePad(-30, -25, COL.cyan, 'ABOUT ME', 'about', 5);
+
+  // ─────────────── GITHUB CONTRIBUTION GRAPH (3D sculpture) ───────────────
+  // Fetches real public commit data for Imranpasha30 and renders as a
+  // 53-week × 7-day grid of glowing cubes whose height = commit count.
+  // No auth required — uses free deno.dev contributions API.
+  const ghGroup = new THREE.Group();
+  ghGroup.position.set(-30, 0, -38);   // sits behind the about zone
+  scene.add(ghGroup);
+  // Pedestal/base
+  const ghBase = new THREE.Mesh(
+    new THREE.BoxGeometry(13, 0.5, 4),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.85 })
+  );
+  ghBase.position.y = 0.25;
+  ghGroup.add(ghBase);
+  const ghLabel = makeLabel('GITHUB · 365 days', '#3E2418', 80);
+  ghLabel.position.set(0, 4.0, 0);
+  ghLabel.scale.set(0.55, 0.55, 0.55);
+  ghGroup.add(ghLabel);
+  // Loading placeholder cubes (mock until fetch returns)
+  const ghCubes = [];
+  function buildGhCubes(weeks) {
+    // Clear old cubes
+    for (const c of ghCubes) ghGroup.remove(c);
+    ghCubes.length = 0;
+    const cubeSize = 0.18, gap = 0.04;
+    const totalW = weeks.length * (cubeSize + gap);
+    for (let w = 0; w < weeks.length; w++) {
+      for (let d = 0; d < 7; d++) {
+        const day = weeks[w][d];
+        if (!day) continue;
+        const count = day.contributionCount || 0;
+        const h = 0.10 + Math.min(count, 30) * 0.12;
+        // Color based on commit intensity (green scale like GitHub)
+        const intensity = Math.min(1, count / 12);
+        const color = new THREE.Color().setHSL(0.34, 0.85, 0.18 + intensity * 0.45);
+        const mat = new THREE.MeshStandardMaterial({
+          color, emissive: color, emissiveIntensity: 0.4 + intensity * 0.6, roughness: 0.4,
+        });
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(cubeSize, h, cubeSize), mat);
+        cube.position.set(
+          -totalW/2 + w * (cubeSize + gap) + cubeSize/2,
+          0.5 + h/2,
+          -3 * (cubeSize + gap) + d * (cubeSize + gap)
+        );
+        ghGroup.add(cube);
+        ghCubes.push(cube);
+      }
+    }
+  }
+  // Mock placeholder data while real fetch is pending
+  buildGhCubes(Array.from({ length: 53 }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => ({ contributionCount: Math.floor(Math.random() * 6) }))
+  ));
+  // Fetch real data (free no-auth API). Falls back silently if blocked.
+  fetch('https://github-contributions-api.deno.dev/Imranpasha30.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !data.contributions) return;
+      // API shape: contributions = array of weeks, each week = array of {date, contributionCount, ...}
+      buildGhCubes(data.contributions);
+      console.log('[gh-graph] loaded', data.contributions.length, 'weeks of real GitHub data');
+    })
+    .catch((e) => console.warn('[gh-graph] using mock data:', e.message));
   // Info sign post
   const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3, 8), new THREE.MeshStandardMaterial({ color: 0x222 }));
   signPost.position.set(-30, 1.5, -25); scene.add(signPost);
@@ -2632,24 +3033,136 @@
 
   // ─ SOCIAL ZONE — 4 floating glowing icons (drive under to "open")
   const SOCIALS = [
-    { name: 'GitHub', url: 'https://github.com/Imranpasha30', color: 0xffffff, sym: 'GH' },
-    { name: 'LinkedIn', url: 'https://www.linkedin.com/in/imran-pasha-/', color: 0x5ce5ff, sym: 'in' },
-    { name: 'Twitter', url: 'https://twitter.com/', color: 0x8a3eff, sym: 'X' },
-    { name: 'HackTheBox', url: 'https://www.hackthebox.com/', color: 0xc1ff12, sym: 'HTB' },
+    { name: 'GitHub',     url: 'https://github.com/Imranpasha30',                    brand: 0x24292e, color: 0xffffff },
+    { name: 'LinkedIn',   url: 'https://www.linkedin.com/in/imran-pasha-/',          brand: 0x0a66c2, color: 0x0a66c2 },
+    { name: 'Twitter',    url: 'https://twitter.com/',                                brand: 0x000000, color: 0xffffff },
+    { name: 'HackTheBox', url: 'https://www.hackthebox.com/',                         brand: 0x9fef00, color: 0x9fef00 },
   ];
+
+  // Procedural logo painter — draws the recognisable brand mark for each social into a CanvasTexture.
+  function makeSocialLogo(name) {
+    const cv = document.createElement('canvas');
+    cv.width = 256; cv.height = 256;
+    const c = cv.getContext('2d');
+    if (name === 'GitHub') {
+      // Black rounded square with simplified Octocat (head + ears + eye)
+      c.fillStyle = '#24292e';
+      roundRect(c, 8, 8, 240, 240, 38); c.fill();
+      // Head circle
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(128, 130, 70, 0, Math.PI*2); c.fill();
+      // Ears (triangles top-left + top-right)
+      c.beginPath(); c.moveTo(78, 76); c.lineTo(96, 92); c.lineTo(74, 110); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(178, 76); c.lineTo(160, 92); c.lineTo(182, 110); c.closePath(); c.fill();
+      // Eye
+      c.fillStyle = '#24292e';
+      c.beginPath(); c.arc(128, 128, 14, 0, Math.PI*2); c.fill();
+      // Smile (small curve)
+      c.strokeStyle = '#24292e'; c.lineWidth = 6; c.lineCap = 'round';
+      c.beginPath(); c.arc(128, 145, 22, 0.2, Math.PI - 0.2); c.stroke();
+      // Tentacle (squiggle below)
+      c.strokeStyle = '#ffffff'; c.lineWidth = 18; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(108, 198); c.quadraticCurveTo(128, 222, 148, 198); c.stroke();
+    } else if (name === 'LinkedIn') {
+      // LinkedIn blue with bold white "in"
+      c.fillStyle = '#0a66c2';
+      roundRect(c, 8, 8, 240, 240, 38); c.fill();
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 170px "Helvetica", Arial, sans-serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('in', 128, 148);
+    } else if (name === 'Twitter') {
+      // X (rebrand) — black square with white X mark
+      c.fillStyle = '#000000';
+      roundRect(c, 8, 8, 240, 240, 38); c.fill();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 38; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(72, 72); c.lineTo(184, 184); c.stroke();
+      c.beginPath(); c.moveTo(184, 72); c.lineTo(72, 184); c.stroke();
+    } else if (name === 'HackTheBox') {
+      // HTB green hexagonal mark on black
+      c.fillStyle = '#0e1a0e';
+      roundRect(c, 8, 8, 240, 240, 38); c.fill();
+      // Hexagon
+      c.strokeStyle = '#9fef00'; c.lineWidth = 12; c.lineJoin = 'round';
+      c.beginPath();
+      const hex = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI/3 * i - Math.PI/2;
+        hex.push([128 + 80 * Math.cos(a), 128 + 80 * Math.sin(a)]);
+      }
+      c.moveTo(hex[0][0], hex[0][1]);
+      for (let i = 1; i < 6; i++) c.lineTo(hex[i][0], hex[i][1]);
+      c.closePath(); c.stroke();
+      // Inner ::HTB:: text style — bracket marks
+      c.fillStyle = '#9fef00';
+      c.font = 'bold 64px "JetBrains Mono", monospace';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('HTB', 128, 130);
+      c.font = 'bold 24px "JetBrains Mono", monospace';
+      c.fillText('::    ::', 128, 170);
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
   SOCIALS.forEach((s, i) => {
-    // Spread across Social Boulevard (-30 to +30) at z=60
     const x = -30 + i * 20;
     const z = 60;
-    const torus = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.18, 16, 32), new THREE.MeshStandardMaterial({ color: s.color, emissive: s.color, emissiveIntensity: 0.7, roughness: 0.3 }));
+    // Glowing torus frame in brand color
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(1.5, 0.22, 16, 32),
+      new THREE.MeshStandardMaterial({ color: s.color, emissive: s.color, emissiveIntensity: 0.85, roughness: 0.3 })
+    );
     torus.position.set(x, 4, z); torus.castShadow = true; scene.add(torus);
-    const lab = makeLabel(s.sym, '#ffffff', 120);
-    lab.position.set(x, 4, z); lab.scale.set(0.35, 0.35, 0.35); scene.add(lab);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.14, 32), new THREE.MeshStandardMaterial({ color: 0x1a1432, emissive: s.color, emissiveIntensity: 0.25 }));
+
+    // Logo disc inside the torus — the actual brand mark
+    const logoTex = makeSocialLogo(s.name);
+    const logoMat = new THREE.MeshStandardMaterial({
+      map: logoTex,
+      emissive: 0x222222, emissiveIntensity: 0.4,
+      roughness: 0.5, metalness: 0.1,
+      side: THREE.DoubleSide,
+    });
+    const logoDisc = new THREE.Mesh(new THREE.CircleGeometry(1.35, 32), logoMat);
+    logoDisc.position.set(x, 4, z + 0.05);
+    scene.add(logoDisc);
+    // Backside copy so it reads from both directions
+    const logoBack = new THREE.Mesh(new THREE.CircleGeometry(1.35, 32), logoMat);
+    logoBack.position.set(x, 4, z - 0.05);
+    logoBack.rotation.y = Math.PI;
+    scene.add(logoBack);
+
+    // Brand name caption below
+    const nameLab = makeLabel(s.name, '#3E2418', 80);
+    nameLab.position.set(x, 1.6, z); nameLab.scale.set(0.5, 0.5, 0.5); scene.add(nameLab);
+
+    // Glowing ground pad
+    const pad = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.6, 2.6, 0.14, 32),
+      new THREE.MeshStandardMaterial({ color: 0x1a1432, emissive: s.color, emissiveIntensity: 0.25 })
+    );
     pad.position.set(x, 0.05, z); scene.add(pad);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(2.5, 2.7, 48), new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.7 }));
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(2.5, 2.7, 48),
+      new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.7 })
+    );
     ring.rotation.x = -Math.PI/2; ring.position.set(x, 0.07, z); scene.add(ring);
-    zones.push({ x, z, radius: 2.6, key: 'social_' + i, social: s, ring, label: s.name, lab, torus });
+
+    zones.push({ x, z, radius: 2.6, key: 'social_' + i, social: s, ring, label: s.name, lab: nameLab, torus });
   });
 
   // ─ FUN ZONE — ramp, loop, breakable bricks, pins (Recreation district NW corner)
@@ -3072,6 +3585,122 @@
         }
       }
       if (fwDirty) fwGeo.attributes.position.needsUpdate = true;
+
+      // ─── HOT AIR BALLOON DRIFT ───
+      balloonGroup.position.x += 0.3 * dt;
+      balloonGroup.position.y = 35 + Math.sin(t * 0.4) * 0.8;
+      if (balloonGroup.position.x > 100) balloonGroup.position.x = -100;
+      balloonLight.position.copy(balloonGroup.position);
+
+      // ─── BIRDS V-FORMATION ───
+      birdsTimer -= dt;
+      if (!birdsGroup.visible && birdsTimer <= 0) {
+        birdsGroup.visible = true;
+        birdsProgress = 0;
+        birdsGroup.position.set(-150, 30 + Math.random() * 20, -50 + Math.random() * 100);
+      }
+      if (birdsGroup.visible) {
+        birdsProgress += dt;
+        birdsGroup.position.x += 8 * dt;
+        // Wing flap (rotate cones slightly)
+        const flap = Math.sin(t * 12);
+        for (const b of birds) {
+          b.mesh.position.set(b.ox, flap * 0.05, b.oz);
+        }
+        if (birdsGroup.position.x > 150) {
+          birdsGroup.visible = false;
+          birdsTimer = 50 + Math.random() * 60;
+        }
+      }
+
+      // ─── PET DOG (follow car when close, otherwise wander in park) ───
+      const carDistDog = Math.hypot(carGroup.position.x - dogGroup.position.x, carGroup.position.z - dogGroup.position.z);
+      if (carDistDog < 18 && carDistDog > 4) {
+        dogState = 'follow';
+        dogTarget.x = carGroup.position.x - Math.sin(yaw) * 3;
+        dogTarget.z = carGroup.position.z - Math.cos(yaw) * 3;
+      } else if (dogState === 'follow' && carDistDog > 22) {
+        dogState = 'wander';
+        dogTarget.x = -58 + (Math.random() - 0.5) * 10;
+        dogTarget.z = -50 + (Math.random() - 0.5) * 10;
+      }
+      const ddx = dogTarget.x - dogGroup.position.x;
+      const ddz = dogTarget.z - dogGroup.position.z;
+      const ddist = Math.hypot(ddx, ddz);
+      if (ddist > 0.4) {
+        const dogSpd = dogState === 'follow' ? 5 : 1.5;
+        dogGroup.position.x += ddx / ddist * dogSpd * dt;
+        dogGroup.position.z += ddz / ddist * dogSpd * dt;
+        dogGroup.rotation.y = Math.atan2(ddx, ddz);
+        dogTail.rotation.y = Math.sin(t * 12) * 0.4;     // tail wag
+      } else if (dogState === 'wander') {
+        dogTarget.x = -58 + (Math.random() - 0.5) * 14;
+        dogTarget.z = -50 + (Math.random() - 0.5) * 14;
+      }
+
+      // ─── BUNKER EASTER EGG (hold E for 3 sec at trigger) ───
+      const bd = Math.hypot(carGroup.position.x - BUNKER_TRIGGER.x, carGroup.position.z - BUNKER_TRIGGER.z);
+      if (bd < BUNKER_TRIGGER.radius && (keys.f === false) /* idle */ && (typeof window.__imranEHeld !== 'undefined' && window.__imranEHeld)) {
+        bunkerProgress += dt;
+        if (bunkerProgress >= 3 && !bunkerActive) {
+          bunkerActive = true;
+          stats.foundBunker = true;
+          // Teleport camera into the bunker (move car too so the camera follows naturally)
+          window.imranWorld.teleport(-30, 50);
+          chassis.position.y = -7.5;
+          if (window.__imranToast) window.__imranToast('🥚 SECRET BUNKER UNLOCKED');
+        }
+      } else {
+        bunkerProgress = Math.max(0, bunkerProgress - dt * 0.5);
+      }
+      // CRT scroll (always animating)
+      crtScroll += dt * 1.2;
+      if (Math.floor(crtScroll * 10) % 5 === 0) drawCrt();
+
+      // ─── NITRO BOOST EFFECT ON CAR SPEED ───
+      if (nitroActive) {
+        nitroTimer -= dt;
+        // Goose the car speed during nitro
+        const fwd = new CANNON.Vec3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        chassis.velocity.x += fwd.x * 30 * dt;
+        chassis.velocity.z += fwd.z * 30 * dt;
+        // Allow higher top speed during nitro
+        const sp = Math.hypot(chassis.velocity.x, chassis.velocity.z);
+        const NITRO_MAX = 35;
+        if (sp > NITRO_MAX) {
+          chassis.velocity.x *= NITRO_MAX / sp;
+          chassis.velocity.z *= NITRO_MAX / sp;
+        }
+        if (nitroTimer <= 0) nitroActive = false;
+      }
+
+      // ─── ACHIEVEMENT STAT TRACKING ───
+      const carV = Math.hypot(chassis.velocity.x, chassis.velocity.z);
+      stats.distance += carV * dt;
+      if (carV > stats.topSpeed) stats.topSpeed = carV;
+      stats.coins = (typeof coinsCollected !== 'undefined') ? coinsCollected : 0;
+      // Track zone visits
+      if (activeZone && activeZone.key) stats.zonesVisited.add(activeZone.key);
+      // Track flight
+      if (flyMode) stats.flewOnce = true;
+      // Track drift score (drift smoke condition is the same: speed>8 + steerInput>0.6)
+      const steerNow = (keys.l ? 1 : 0) - (keys.r ? 1 : 0) - touch.x;
+      if (carV > 8 && Math.abs(steerNow) > 0.6 && !flyMode) {
+        driftDuration += dt;
+        stats.driftTime = Math.max(stats.driftTime, driftDuration);
+        driftScore += dt * 50 * (carV / 22);
+      } else {
+        if (driftDuration > 0.7 && driftScore > 50) {
+          totalDriftScore += Math.floor(driftScore);
+          if (window.__imranToast) window.__imranToast(`🌀 +${Math.floor(driftScore)} DRIFT (${totalDriftScore} total)`);
+        }
+        driftDuration = 0;
+        driftScore = 0;
+      }
+      // Time trial: end when all 5 main zones visited
+      if (trialActive && stats.zonesVisited.size >= 5) endTrial();
+      // Run achievement check ~once per second
+      if (Math.floor(t) !== Math.floor(t - dt)) checkAchievements();
 
       // ─── COIN ANIMATION + COLLECTION ───
       const cp = carGroup.position;

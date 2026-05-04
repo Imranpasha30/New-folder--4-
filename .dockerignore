@@ -1,0 +1,36 @@
+# Don't bake any of these into the image
+node_modules
+npm-debug.log*
+
+# Secrets — NEVER in the image
+gemini.key
+*.key
+*.pem
+.env
+.env.*
+
+# Git + CI
+.git
+.github
+.gitignore
+
+# Local dev artifacts
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
+.claude
+
+# Docs (not needed inside the container)
+*.md
+DEPLOY.md
+README.md
+
+# Setup script (only needed on host, not in container)
+setup-ec2.sh

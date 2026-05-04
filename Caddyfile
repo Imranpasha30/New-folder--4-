@@ -1,0 +1,34 @@
+# Caddy reverse proxy for the portfolio. Caddy auto-issues a Let's Encrypt
+# TLS cert when you use a real domain — no certbot needed.
+#
+# To use a real domain: replace `:80` below with your domain (e.g. `imran.dev {`).
+# Caddy listens on 80 + 443 by default for domains, redirects HTTP → HTTPS.
+#
+# To deploy this file: copy to /etc/caddy/Caddyfile, then `sudo systemctl reload caddy`.
+
+# ─── DOMAIN MODE — uncomment + replace yourdomain.com when DNS A-record is pointed at this server ───
+# yourdomain.com {
+#     encode gzip
+#     # WebSocket multiplayer (longer-lived connections)
+#     handle /ws* {
+#         reverse_proxy localhost:5182
+#     }
+#     # Everything else → Node static + chat proxy
+#     reverse_proxy localhost:5181
+#     header {
+#         # Security hardening
+#         Strict-Transport-Security "max-age=31536000;"
+#         X-Content-Type-Options "nosniff"
+#         Referrer-Policy "strict-origin-when-cross-origin"
+#     }
+# }
+
+# ─── IP-ONLY MODE (no HTTPS — for testing without a domain) ───
+# Browsers will block AR/voice/microphone over plain HTTP.
+:80 {
+    encode gzip
+    handle /ws* {
+        reverse_proxy localhost:5182
+    }
+    reverse_proxy localhost:5181
+}

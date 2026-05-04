@@ -1,0 +1,117 @@
+name: Build & Deploy (Docker)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only one deploy at a time
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write   # needed to push to ghcr.io
+
+    steps:
+      # ────────────── BUILD ──────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Lowercase image name (ghcr.io requires lowercase)
+        id: img
+        run: echo "name=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.img.outputs.name }}:latest
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ────────────── DEPLOY ──────────────
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Trust EC2 host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H -T 10 ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync compose + Caddyfile to EC2
+        run: |
+          rsync -az docker-compose.yml Caddyfile.docker \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/portfolio/
+
+      - name: Bootstrap Docker (first run) + pull & run on EC2
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          GHCR_IMAGE: ${{ steps.img.outputs.name }}:latest
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "GEMINI_KEY='$GEMINI_KEY' GHCR_IMAGE='$GHCR_IMAGE' GHCR_USER='$GHCR_USER' GHCR_PAT='$GHCR_PAT' bash -s" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+
+          # ─── Bootstrap Docker once if missing ───
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "▶ Installing Docker engine..."
+            sudo apt-get update -qq
+            curl -fsSL https://get.docker.com | sudo sh
+            sudo usermod -aG docker "$USER"
+            sudo systemctl enable docker
+            sudo systemctl start docker
+          fi
+
+          # docker compose plugin (newer than docker-compose v1)
+          if ! sudo docker compose version >/dev/null 2>&1; then
+            echo "▶ Installing docker compose plugin..."
+            sudo apt-get install -y -qq docker-compose-plugin
+          fi
+
+          mkdir -p ~/portfolio
+          cd ~/portfolio
+
+          # Auth to GHCR (needed if your package visibility is private)
+          echo "$GHCR_PAT" | sudo docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # Pull the new image and bring up the stack with zero downtime
+          export GEMINI_KEY="$GEMINI_KEY"
+          export GHCR_IMAGE="$GHCR_IMAGE"
+          sudo -E docker compose pull
+          sudo -E docker compose up -d --remove-orphans
+
+          # Show running containers
+          sudo docker compose ps
+
+          # Clean up old unused images so disk doesn't fill up
+          sudo docker image prune -f >/dev/null
+
+          echo "✅ Deploy complete at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          REMOTE_SCRIPT

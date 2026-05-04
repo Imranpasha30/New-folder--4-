@@ -1,0 +1,17 @@
+# NEVER commit secrets
+gemini.key
+*.key
+.env
+.env.*
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build / cache
+dist/
+.cache/

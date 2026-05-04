@@ -1,5 +1,20 @@
 {
+  "name": "imran-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "mp": "node multiplayer-server.js",
+    "pm2:start": "pm2 start pm2.config.cjs",
+    "pm2:reload": "pm2 reload pm2.config.cjs --update-env",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status"
+  },
   "dependencies": {
-    "cannon": "^0.6.2"
+    "cannon": "^0.6.2",
+    "ws": "^8.20.0"
   }
 }

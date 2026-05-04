@@ -1,0 +1,59 @@
+# Production stack — runs on the EC2 box.
+# All 3 services share an internal Docker network. Only Caddy exposes ports
+# 80/443 to the host. Web + MP are reachable only inside the container network.
+#
+# Required environment variables (set by deploy.yml or via shell export):
+#   GHCR_IMAGE  — full image name like ghcr.io/imranpasha30/portfolio:latest
+#   GEMINI_KEY  — passed through to the web service for the chatbot proxy
+services:
+  web:
+    image: ${GHCR_IMAGE}
+    restart: always
+    container_name: portfolio-web
+    environment:
+      - NODE_ENV=production
+      - GEMINI_KEY=${GEMINI_KEY}
+    expose:
+      - "5181"
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5181/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mp:
+    image: ${GHCR_IMAGE}
+    restart: always
+    container_name: portfolio-mp
+    command: ["node", "multiplayer-server.js"]
+    environment:
+      - NODE_ENV=production
+    expose:
+      - "5182"
+    networks: [internal]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    container_name: portfolio-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal]
+    depends_on:
+      - web
+      - mp
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

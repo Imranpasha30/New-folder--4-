@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="world.css?v=8"/>
+<link rel="stylesheet" href="world.css?v=11"/>
 </head>
 <body>
 
@@ -44,9 +44,51 @@
     <button id="liteBtn">lite mode</button>
     <button id="muteBtn" title="mute (M)">🔊 sound</button>
     <button id="hornBtn" title="honk (H)">📯 honk</button>
+    <button id="voiceBtn" title="voice commands">🎤 voice</button>
+    <button id="arBtn" title="View in AR" hidden>📱 AR</button>
     <button id="resetBtn">↺ reset</button>
     <button id="camBtn">cam</button>
   </div>
+  <div class="mp-status" id="mpStatus" hidden>🟢 <span id="mpCount">0</span> online</div>
+  <div class="visitor-counter" id="visitorCounter">👀 <span id="visitorCount">…</span> visits</div>
+  <button class="achv-btn" id="achvBtn" title="Achievements">🏆 <span id="achvCount">0/8</span></button>
+  <button class="share-btn" id="shareBtn" title="Share this spot">🔗 share</button>
+  <div class="trial-hud" id="trialHud" hidden>⏱ <span id="trialTime">0.0</span>s · <span id="trialZones">0</span>/5 zones</div>
+</div>
+
+<!-- Achievements modal -->
+<div class="achv-modal" id="achvModal" hidden>
+  <button class="achv-close" id="achvClose">×</button>
+  <h2>🏆 Achievements</h2>
+  <div class="achv-list" id="achvList"></div>
+</div>
+
+<!-- Photo mode overlay (F2) -->
+<div class="photo-mode" id="photoMode" hidden>
+  <div class="photo-controls">
+    <button id="photoSave">📷 SAVE PNG</button>
+    <button id="photoExit">✕ EXIT (F2)</button>
+  </div>
+</div>
+
+<!-- AI-Imran chatbot — floating button + modal -->
+<button class="chat-fab" id="chatFab" title="Ask AI Imran">💬 ask imran</button>
+<div class="chat-modal" id="chatModal" hidden>
+  <div class="chat-header">
+    <div class="chat-title">💬 AI <span class="pink">Imran</span></div>
+    <button class="chat-close" id="chatClose">×</button>
+  </div>
+  <div class="chat-history" id="chatHistory">
+    <div class="chat-msg chat-msg-bot">hey 👋 i'm AI-Imran. ask me about my projects, skills, hiring, anything.</div>
+  </div>
+  <form class="chat-input-form" id="chatForm">
+    <input type="text" id="chatInput" placeholder="Type your message..." autocomplete="off"/>
+    <button type="submit" id="chatSend">send</button>
+  </form>
+</div>
+
+<!-- HUD continued (these were originally inside .hud before my refactor) -->
+<div class="hud-rest" id="hudRest" style="display:none;">
   <div class="mobile-ctrl">
     <div class="joystick"><div class="nub"></div></div>
     <div class="btn-group">
@@ -119,7 +161,7 @@ const ld = setInterval(() => {
 }, 80);
 </script>
 
-<script src="world.js?v=27"></script>
+<script src="world.js?v=31"></script>
 
 <script>
 // Start handler
@@ -129,8 +171,7 @@ playBtn.addEventListener('click', () => {
   if (window.imranSound) { window.imranSound.unlock(); window.imranSound.click(); }
   start.classList.add('hidden');
   hud.style.display = 'block';
-  // Set a sticky flag so world.js can pick it up even if it boots AFTER this click
-  // (race: Three.js ESM module may still be loading when user clicks play).
+  document.getElementById('hudRest').style.display = 'block';   // mobile-ctrl, toast, minimap, cinematic
   window.__imranStartRequested = true;
   window.dispatchEvent(new Event('imran:start'));
 });
@@ -165,6 +206,199 @@ window.addEventListener('imran:cinematic:start', () => {
 window.addEventListener('imran:cinematic:end', () => {
   cinematicOverlay.classList.remove('show');
 });
+
+// ────────── VOICE COMMANDS (Web Speech API) ──────────
+(function () {
+  const voiceBtn = document.getElementById('voiceBtn');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    voiceBtn.disabled = true;
+    voiceBtn.title = 'Voice commands not supported in this browser';
+    voiceBtn.style.opacity = 0.4;
+    return;
+  }
+  let listening = false;
+  const recog = new SR();
+  recog.continuous = true;
+  recog.interimResults = false;
+  recog.lang = 'en-US';
+
+  // Map of zone keywords → world API actions
+  function navigate(targetWord) {
+    if (!window.imranWorld) return false;
+    const zones = window.imranWorld.getZones();
+    // Match by key or label substring
+    let match = null;
+    for (const z of zones) {
+      const k = (z.key || '').toLowerCase();
+      const l = (z.label || '').toLowerCase();
+      if (k === targetWord || l === targetWord || k.startsWith(targetWord) || l.startsWith(targetWord)) {
+        match = z; break;
+      }
+    }
+    // Special aliases
+    if (!match) {
+      if (targetWord === 'spawn' || targetWord === 'home' || targetWord === 'start') {
+        window.imranWorld.teleport(0, 0); return true;
+      }
+      if (targetWord === 'tower' || targetWord === 'observation') {
+        window.imranWorld.teleport(78, 65); return true;
+      }
+      if (targetWord === 'park') {
+        window.imranWorld.teleport(-50, -55); return true;
+      }
+      if (targetWord === 'lake' || targetWord === 'pier') {
+        window.imranWorld.teleport(60, -65); return true;
+      }
+      if (targetWord === 'fun' || targetWord === 'loop') {
+        window.imranWorld.teleport(-55, 55); return true;
+      }
+    }
+    if (match) {
+      window.imranWorld.teleport(match.x, match.z);
+      showToast(`🎤 jumped to <span class="pink">${match.label || match.key}</span>`);
+      return true;
+    }
+    return false;
+  }
+
+  recog.onresult = (event) => {
+    const last = event.results[event.results.length - 1];
+    const phrase = last[0].transcript.trim().toLowerCase();
+    showToast(`🎤 heard "${phrase}"`);
+    // Navigation: match "go to X" / "take me to X" / "drive to X" / "open X" / "show me X" / "X please"
+    const navMatch = phrase.match(/(?:go to|take me to|drive to|open|show me|jump to|teleport to)\s+(?:the\s+)?(\w+)/);
+    if (navMatch) { navigate(navMatch[1]); return; }
+    // Single-word zone names
+    const oneWord = phrase.replace(/[^a-z]/g, '');
+    if (['about','projects','project','skills','contact','social','socials','spawn','home','tower','park','lake','fun','loop'].includes(oneWord)) {
+      navigate(oneWord); return;
+    }
+    // Action commands
+    if (phrase.includes('fly') || phrase.includes('takeoff') || phrase.includes('take off')) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyL' }));
+      return;
+    }
+    if (phrase.includes('land')) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyL' }));
+      return;
+    }
+    if (phrase.includes('honk') || phrase.includes('beep')) {
+      if (window.imranSound) window.imranSound.honk(); return;
+    }
+    if (phrase.includes('next') && phrase.includes('project')) {
+      if (window.__imranProjectCycle) window.__imranProjectCycle(+1); return;
+    }
+    if ((phrase.includes('previous') || phrase.includes('prev') || phrase.includes('back')) && phrase.includes('project')) {
+      if (window.__imranProjectCycle) window.__imranProjectCycle(-1); return;
+    }
+    if (phrase.includes('reset')) {
+      window.dispatchEvent(new Event('imran:reset')); return;
+    }
+    if (phrase.includes('drone') || phrase.includes('cinematic')) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })); return;
+    }
+  };
+  recog.onend = () => {
+    if (listening) recog.start();         // auto-restart while user wants it on
+  };
+  recog.onerror = (e) => {
+    console.warn('SpeechRecognition error:', e.error);
+  };
+
+  voiceBtn.addEventListener('click', () => {
+    listening = !listening;
+    voiceBtn.classList.toggle('listening', listening);
+    voiceBtn.textContent = listening ? '🔴 listening' : '🎤 voice';
+    if (listening) {
+      try { recog.start(); }
+      catch (e) { console.warn(e); }
+      showToast('🎤 try: "go to projects" / "fly" / "honk" / "next project"');
+    } else {
+      recog.stop();
+    }
+  });
+})();
+
+// ────────── AR MODE (WebXR) ──────────
+(function () {
+  const arBtn = document.getElementById('arBtn');
+  if (!('xr' in navigator)) return;
+  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    if (!supported) return;
+    arBtn.hidden = false;
+    arBtn.addEventListener('click', async () => {
+      try {
+        const session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['local'] });
+        if (window.imranXR && window.imranXR.enterAR) {
+          window.imranXR.enterAR(session);
+          showToast('📱 AR mode — point your phone at a flat surface');
+        }
+      } catch (e) {
+        showToast('AR not available on this device');
+        console.warn('AR error:', e);
+      }
+    });
+  }).catch(() => {});
+})();
+
+// ────────── MULTIPLAYER (WebSocket) ──────────
+(function () {
+  const mpStatus = document.getElementById('mpStatus');
+  const mpCountEl = document.getElementById('mpCount');
+  if (!mpStatus) return;
+  // In production (HTTPS via Caddy reverse proxy), use wss://host/ws (no port).
+  // In local dev (HTTP), connect directly to multiplayer-server.js on port 5182.
+  const isProd = location.protocol === 'https:';
+  const wsUrl = isProd
+    ? `wss://${location.host}/ws`
+    : `ws://${location.hostname}:5182`;
+  let ws = null, myId = null, peers = new Map();
+  let lastSent = 0;
+
+  function connect() {
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) { return; }
+    ws.addEventListener('open', () => {
+      mpStatus.hidden = false;
+      mpCountEl.textContent = '1';
+    });
+    ws.addEventListener('close', () => {
+      mpStatus.hidden = true;
+      // Try to reconnect after 5 sec
+      setTimeout(connect, 5000);
+    });
+    ws.addEventListener('error', () => {});
+    ws.addEventListener('message', (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.type === 'welcome') {
+        myId = msg.id;
+      } else if (msg.type === 'state') {
+        // Full snapshot: list of {id, x, y, z, yaw}
+        peers.clear();
+        for (const p of msg.players) {
+          if (p.id !== myId) peers.set(p.id, p);
+        }
+        mpCountEl.textContent = msg.players.length;
+        if (window.imranXR && window.imranXR.setRemotePlayers) {
+          window.imranXR.setRemotePlayers(Array.from(peers.values()));
+        }
+      }
+    });
+  }
+
+  // Send our position 8 times per second
+  setInterval(() => {
+    if (!ws || ws.readyState !== 1 || !window.imranWorld) return;
+    const pos = window.imranWorld.getCarPos();
+    const yaw = window.imranWorld.getCarYaw();
+    ws.send(JSON.stringify({ type: 'pos', x: pos.x, z: pos.z, yaw }));
+  }, 125);
+
+  connect();
+})();
 
 // Hire-me banner click → mailto
 document.querySelector('.hire-banner').addEventListener('click', () => {
@@ -201,8 +435,9 @@ document.getElementById('camBtn').addEventListener('click', () => {
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC' }));
 });
 
-// Global mute via M key
+// Global mute via M key (skip when typing in input/textarea)
 window.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.code === 'KeyM' && !e.repeat) muteBtn.click();
 });
 
@@ -430,6 +665,182 @@ window.addEventListener('imran:interact', () => {
       // Teleport slightly in front of the zone so the car drives ONTO the pad
       window.imranWorld.teleport(best.x, best.z);
       showToast(`🚀 jumped to <span class="pink">${best.label || best.key}</span>`);
+    }
+  });
+})();
+
+// ────────── PHOTO MODE (F2 = freeze HUD, screenshot WebGL canvas) ──────────
+(function () {
+  const photoMode = document.getElementById('photoMode');
+  const photoSave = document.getElementById('photoSave');
+  const photoExit = document.getElementById('photoExit');
+  let active = false;
+  function enter() {
+    active = true;
+    document.body.classList.add('photo-mode-on');
+    photoMode.hidden = false;
+  }
+  function exit() {
+    active = false;
+    document.body.classList.remove('photo-mode-on');
+    photoMode.hidden = true;
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'F2') { e.preventDefault(); active ? exit() : enter(); }
+  });
+  photoExit.addEventListener('click', exit);
+  photoSave.addEventListener('click', () => {
+    const canvas = document.querySelector('#world canvas');
+    if (!canvas) return;
+    // preserveDrawingBuffer is false on the renderer — request one fresh frame then capture
+    if (window.imranWorld) {/* render happens in tick already, just capture */}
+    const data = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = data;
+    a.download = `imran-world-${Date.now()}.png`;
+    a.click();
+    showToast('📸 screenshot saved');
+  });
+})();
+
+// ────────── ACHIEVEMENTS modal ──────────
+(function () {
+  const btn = document.getElementById('achvBtn');
+  const modal = document.getElementById('achvModal');
+  const close = document.getElementById('achvClose');
+  const list = document.getElementById('achvList');
+  const count = document.getElementById('achvCount');
+  function refresh() {
+    if (!window.imranAchievements) { setTimeout(refresh, 500); return; }
+    const { list: items, unlocked } = window.imranAchievements;
+    list.innerHTML = '';
+    for (const a of items) {
+      const got = unlocked.has(a.id);
+      const row = document.createElement('div');
+      row.className = 'achv-row' + (got ? ' got' : '');
+      row.innerHTML = `<span class="achv-icon">${got ? a.icon : '🔒'}</span><span class="achv-text">${a.text}</span>`;
+      list.appendChild(row);
+    }
+    count.textContent = `${unlocked.size}/${items.length}`;
+  }
+  btn.addEventListener('click', () => {
+    refresh();
+    modal.hidden = false;
+    if (window.imranSound) window.imranSound.click();
+  });
+  close.addEventListener('click', () => { modal.hidden = true; });
+  setInterval(refresh, 2000);   // keep counter up to date
+})();
+
+// ────────── SHARE-THIS-SPOT URL ──────────
+(function () {
+  const btn = document.getElementById('shareBtn');
+  btn.addEventListener('click', async () => {
+    if (!window.imranWorld) return;
+    const pos = window.imranWorld.getCarPos();
+    const url = `${location.origin}${location.pathname}?x=${pos.x.toFixed(1)}&z=${pos.z.toFixed(1)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(`🔗 link copied — paste anywhere!`);
+    } catch (e) {
+      // Fallback: show prompt
+      window.prompt('Copy this link:', url);
+    }
+    if (window.imranSound) window.imranSound.click();
+  });
+  // On load, check URL params for spawn coordinates
+  setTimeout(() => {
+    const params = new URLSearchParams(location.search);
+    const x = parseFloat(params.get('x'));
+    const z = parseFloat(params.get('z'));
+    if (window.imranWorld && !isNaN(x) && !isNaN(z)) {
+      window.imranWorld.teleport(x, z);
+      showToast(`🔗 jumped to shared spot (${x.toFixed(0)}, ${z.toFixed(0)})`);
+    }
+  }, 1500);
+})();
+
+// ────────── VISITOR COUNTER (uses CountAPI free service) ──────────
+(function () {
+  const el = document.getElementById('visitorCount');
+  if (!el) return;
+  // CountAPI is a free no-auth counter. Bump and read in one call.
+  fetch('https://api.countapi.xyz/hit/imran-pasha-portfolio/visits')
+    .then((r) => r.json())
+    .then((d) => { el.textContent = (d && d.value) ? d.value.toLocaleString() : '—'; })
+    .catch(() => {
+      // Service unavailable — silent fallback to localStorage rough estimate
+      const n = parseInt(localStorage.getItem('imranVisits') || '0', 10) + 1;
+      localStorage.setItem('imranVisits', n);
+      el.textContent = n + ' (local)';
+    });
+})();
+
+// ────────── REDUCE-MOTION MODE (auto-detected via OS preference) ──────────
+(function () {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.body.classList.add('reduce-motion');
+    // Tell world.js to disable bloom + dust + cinematic intro by triggering lite mode
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('imran:lite', { detail: true }));
+    }, 100);
+  }
+})();
+
+// ────────── AI-IMRAN CHATBOT (proxies through /api/chat → Gemini) ──────────
+(function () {
+  const fab = document.getElementById('chatFab');
+  const modal = document.getElementById('chatModal');
+  const close = document.getElementById('chatClose');
+  const history = document.getElementById('chatHistory');
+  const form = document.getElementById('chatForm');
+  const input = document.getElementById('chatInput');
+  const send = document.getElementById('chatSend');
+  const conversation = [];     // {role: 'user'|'bot', text: '...'}
+
+  fab.addEventListener('click', () => {
+    modal.hidden = false;
+    setTimeout(() => input.focus(), 50);
+    if (window.imranSound) window.imranSound.click();
+  });
+  close.addEventListener('click', () => { modal.hidden = true; });
+
+  function addMessage(text, who) {
+    const div = document.createElement('div');
+    div.className = `chat-msg chat-msg-${who}`;
+    div.textContent = text;
+    history.appendChild(div);
+    history.scrollTop = history.scrollHeight;
+    return div;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = input.value.trim();
+    if (!msg) return;
+    addMessage(msg, 'user');
+    conversation.push({ role: 'user', text: msg });
+    input.value = '';
+    send.disabled = true;
+    const typingMsg = addMessage('typing…', 'bot');
+    typingMsg.classList.add('typing');
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history: conversation.slice(0, -1) }),
+      });
+      const data = await res.json();
+      typingMsg.remove();
+      const reply = data.reply || '(error)';
+      addMessage(reply, 'bot');
+      conversation.push({ role: 'bot', text: reply });
+    } catch (err) {
+      typingMsg.remove();
+      addMessage('(connection error — is the server running?)', 'bot');
+    } finally {
+      send.disabled = false;
+      input.focus();
     }
   });
 })();
