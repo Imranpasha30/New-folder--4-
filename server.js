@@ -11,6 +11,39 @@ const path = require('path');
 
 const PORT = 5181;
 const ROOT = __dirname;
+// Persistent visit log — survives container restarts (mounted as Docker volume in prod).
+// In local dev, defaults to a file in the project root.
+const DATA_DIR = process.env.VISITS_DATA_DIR || ROOT;
+const VISITS_FILE = path.join(DATA_DIR, 'visits.json');
+
+// Load existing visits on boot, or initialize empty
+let visitData = { total: 0, unique: 0, recent: [], uuids: {} };
+try {
+  if (fs.existsSync(VISITS_FILE)) {
+    const raw = fs.readFileSync(VISITS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    visitData = { total: 0, unique: 0, recent: [], uuids: {}, ...parsed };
+    console.log(`[visits] loaded ${visitData.total} visits, ${visitData.unique} unique from ${VISITS_FILE}`);
+  }
+} catch (e) {
+  console.warn('[visits] could not load visits.json, starting fresh:', e.message);
+}
+
+// Throttled save — write at most once per 5 sec to avoid disk spam
+let saveTimer = null;
+function persistVisits() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      // Cap recent at 200 entries (display only ever shows 30)
+      visitData.recent = visitData.recent.slice(-200);
+      fs.writeFileSync(VISITS_FILE, JSON.stringify(visitData));
+    } catch (e) {
+      console.warn('[visits] save failed:', e.message);
+    }
+  }, 5000);
+}
 
 // Gemini key resolution order (production-friendly):
 //   1. GEMINI_KEY environment variable (PM2/systemd injects this in production)
@@ -85,6 +118,58 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' });
     res.end(); return;
+  }
+
+  // ─── /api/visit POST — record a visit (called by client on first page load) ───
+  if (req.url === '/api/visit' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk.toString(); if (body.length > 4_000) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { uuid } = JSON.parse(body);
+        if (!uuid || typeof uuid !== 'string' || uuid.length > 64) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'invalid uuid' }));
+          return;
+        }
+        visitData.total++;
+        const isNewUnique = !visitData.uuids[uuid];
+        if (isNewUnique) {
+          visitData.uuids[uuid] = visitData.total;
+          visitData.unique++;
+        }
+        // Push to recent log (anonymized — only short uuid prefix + timestamp + new flag)
+        visitData.recent.push({
+          ts: Date.now(),
+          short: uuid.slice(0, 6),
+          isNew: isNewUnique,
+        });
+        persistVisits();
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ total: visitData.total, unique: visitData.unique, isNew: isNewUnique }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: String(e.message || e) }));
+      }
+    });
+    return;
+  }
+
+  // ─── /api/visits/stats GET — total + unique counts ───
+  if (req.url === '/api/visits/stats' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ total: visitData.total, unique: visitData.unique }));
+    return;
+  }
+
+  // ─── /api/visits/recent GET — last N visits for the guestbook scroll ───
+  if (req.url.startsWith('/api/visits/recent') && req.method === 'GET') {
+    const url = new URL(req.url, 'http://localhost');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '30', 10) || 30, 100);
+    const recent = visitData.recent.slice(-limit).reverse();   // newest first
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ recent }));
+    return;
   }
 
   // /api/chat POST handler

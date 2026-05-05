@@ -13,8 +13,11 @@ services:
     environment:
       - NODE_ENV=production
       - GEMINI_KEY=${GEMINI_KEY}
+      - VISITS_DATA_DIR=/data
     expose:
       - "5181"
+    volumes:
+      - visits_data:/data    # persistent visits.json — survives container recreations
     networks: [internal]
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:5181/"]
@@ -59,3 +62,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  visits_data:    # persistent visit log — survives container recreations

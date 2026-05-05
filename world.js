@@ -16,7 +16,7 @@
   const CANNON = window.CANNON;
 
   // Colors
-  const COL = { pink: 0xff3e8a, purple: 0x8a3eff, cyan: 0x5ce5ff, yellow: 0xffe066, red: 0xc63030, dark: 0x1d1a2e };
+  const COL = { pink: 0xffb070, purple: 0x8a3eff, cyan: 0x5ce5ff, yellow: 0xffe066, red: 0xc63030, dark: 0x1d1a2e };
 
   // ─────────────── SOUND MANAGER (Web Audio, procedural — no asset downloads) ───────────────
   const Sound = (function () {
@@ -246,7 +246,7 @@
   const scene = new THREE.Scene();
   // Sunset palette — warm peach sky (was deep purple synthwave night)
   scene.background = new THREE.Color(0xffb070);
-  scene.fog = new THREE.Fog(0xffc79a, 80, 320);
+  scene.fog = new THREE.Fog(0xffc79a, 130, 600);
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 600);
   camera.position.set(0, 8, 16);
@@ -306,14 +306,15 @@
   rimPurple.position.set(22, 14, -16); scene.add(rimPurple);        // over skills cluster
 
   // ─────────────── GROUND + GRID ───────────────
-  const groundGeo = new THREE.PlaneGeometry(400, 400);
-  // Sunset palette — sandy beige (was near-black synthwave)
-  const groundMatT = new THREE.MeshStandardMaterial({ color: 0xe8c290, roughness: 0.95, metalness: 0.0 });
+  // 700m square — ample room inside the 250-radius boundary + 280 mountain ring
+  const groundGeo = new THREE.PlaneGeometry(700, 700);
+  // Switzerland theme — alpine green meadow (was sandy beige)
+  const groundMatT = new THREE.MeshStandardMaterial({ color: 0x6ab040, roughness: 0.95, metalness: 0.0 });
   const ground = new THREE.Mesh(groundGeo, groundMatT);
   ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 
   // Gridlines — keep Tron-purple grid as cybersecurity flag, soften for warm ground
-  const grid = new THREE.GridHelper(400, 80, 0x8a3eff, 0xc49ee6);
+  const grid = new THREE.GridHelper(700, 140, 0x8a3eff, 0xc49ee6);
   grid.material.transparent = true; grid.material.opacity = 0.28;
   grid.position.y = 0.01;
   scene.add(grid);
@@ -394,10 +395,26 @@
   // East-West avenues
   for (const z of ROADS_EW_Z) addRoadStrip(false, 0, z, ROAD_LEN);
 
-  // Intersection accents — small glowing pads where main roads cross
+  // ─── PLANNED EXTENSIONS (civil-engineer plan) ───
+  // Outer ring + spurs that connect previously-orphaned districts to the road grid.
+  // Naming follows CIVIL_PLAN.md.
+  addRoadStrip(true,   42, 0, 100);     // NS-42E "Cable Car Drive" — feeds the cable-car ramp foot at (40, -17.5)
+  addRoadStrip(true,  -42, 0, 100);     // NS-42W — symmetric, feeds Hacker's Den approach
+  addRoadStrip(false,  0,  50, 100);    // EW-50N — north outer avenue, services Socials + Loop area
+  addRoadStrip(false,  0, -50, 100);    // EW-50S — south outer avenue, services Park + Lake + Mailbox
+  addRoadStrip(false, 40, -17.5, 10);   // Cable Car Apron — short bridge from NS-42E into ramp foot at (40, -17.5)
+  addRoadStrip(false, 65,  0, 30);      // EW-0 east extension — flyover east foot now lands on tarmac
+  addRoadStrip(false, 65, -10, 30);     // Server Room spur — connects NS-42E to Server Room (80,-10)
+  addRoadStrip(false,-65, -10, 30);     // Hacker's Den spur — connects NS-42W to Hacker's Den (-80,-10)
+  addRoadStrip(false, 70,  50, 30);     // Tower Approach — leads to Observation Tower (85,65)
+  addRoadStrip(false,-55,  60, 25);     // Recreation Lane — services loop / bowling area
+  addRoadStrip(true, -77,  65, 16);     // Loop entry stub — lines up with loop entry ramp at x=-77
+
+  // Intersection accents — small glowing pads where main roads cross.
+  // Now includes outer-ring corners so the new junctions read as intersections.
   const interMat = new THREE.MeshBasicMaterial({ color: COL.purple, transparent: true, opacity: 0.4 });
-  for (const x of [-22, 0, 22]) {
-    for (const z of [-22, 0, 22]) {
+  for (const x of [-42, -22, 0, 22, 42]) {
+    for (const z of [-50, -22, 0, 22, 50]) {
       const inter = new THREE.Mesh(new THREE.CircleGeometry(2.2, 24), interMat);
       inter.rotation.x = -Math.PI/2;
       inter.position.set(x, 0.05, z);
@@ -506,12 +523,12 @@
   planeGroup.add(planeBody);
   const planeWing = new THREE.Mesh(
     new THREE.BoxGeometry(0.08, 0.06, 1.6),
-    new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 0.4 })
   );
   planeGroup.add(planeWing);
   const planeTail = new THREE.Mesh(
     new THREE.BoxGeometry(0.06, 0.4, 0.3),
-    new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 0.4 })
   );
   planeTail.position.set(-0.7, 0.2, 0);
   planeGroup.add(planeTail);
@@ -521,7 +538,7 @@
   // ─────────────── HOT AIR BALLOON (drifts slowly across sky) ───────────────
   const balloonGroup = new THREE.Group();
   // Stripes of colorful bands
-  const balloonColors = [0xff3e8a, 0xffe066, 0x5ce5ff, 0xff3e8a, 0xffe066];
+  const balloonColors = [0xffb070, 0xffe066, 0x5ce5ff, 0xffb070, 0xffe066];
   for (let i = 0; i < balloonColors.length; i++) {
     const band = new THREE.Mesh(
       new THREE.SphereGeometry(2.5, 16, 8, 0, Math.PI * 2, i * Math.PI / 5, Math.PI / 5),
@@ -603,10 +620,11 @@
   let dogState = 'wander';                 // 'wander' | 'follow'
 
   // ─────────────── HIDDEN BUNKER EASTER EGG ───────────────
-  // Hold E for 3 seconds at (-30, 50) near the HTB skull → camera dips below ground,
+  // Hold E for 3 seconds at (-50, 30) near the HTB skull → camera dips below ground,
   // reveals a small dark room with a CRT terminal showing scrolling code.
+  // Bunker mesh sits 8m underground, directly below the new skull location.
   const bunkerGroup = new THREE.Group();
-  bunkerGroup.position.set(-30, -8, 50);   // 8m below ground
+  bunkerGroup.position.set(-50, -8, 30);   // 8m below ground (under HTB skull)
   // Floor
   const bFloor = new THREE.Mesh(
     new THREE.BoxGeometry(8, 0.3, 8),
@@ -682,7 +700,7 @@
   // State
   let bunkerProgress = 0;             // 0..3 sec hold time at trigger spot
   let bunkerActive = false;
-  const BUNKER_TRIGGER = { x: -30, z: 50, radius: 3 };
+  const BUNKER_TRIGGER = { x: -50, z: 30, radius: 3 };   // co-located with HTB skull
 
   // ─────────────── REFLECTIVE LAKE WATER (faux reflection via mirror plane) ───────────────
   // Note: Real Reflector requires extra render passes which slow things down.
@@ -846,7 +864,7 @@
   for (let i = 0; i < 6; i++) {
     const node = new THREE.Mesh(
       new THREE.SphereGeometry(0.10, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0xff3e8a })
+      new THREE.MeshBasicMaterial({ color: 0xffb070 })
     );
     const orbitR = 1.6 + Math.random() * 0.6;
     const angle = Math.random() * Math.PI * 2;
@@ -1288,11 +1306,11 @@
   // Beacon orb — sphere on top, animated
   const beacon = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 16, 12),
-    new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 1.8 })
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 1.8 })
   );
   beacon.position.y = towerH + 3.4;
   towerGroup.add(beacon);
-  const beaconLight = new THREE.SpotLight(0xff3e8a, 1.8, 80, Math.PI/4, 0.5, 1.2);
+  const beaconLight = new THREE.SpotLight(0xffb070, 1.8, 80, Math.PI/4, 0.5, 1.2);
   beaconLight.position.y = towerH + 3.4;
   beaconLight.target.position.set(20, 0, 0);    // initial
   towerGroup.add(beaconLight);
@@ -1301,29 +1319,31 @@
   scene.add(towerGroup);
 
   // ─────────────── HTB SKULL STATUE (cybersec easter egg) ───────────────
-  // Small statue at (-30, +45) — pedestal + skull.
+  // Gateway landmark for the Hacker's Den district — relocated to (-50, 30) on
+  // the path the player takes from spawn out to the western Hacker's Den.
+  const SKULL_X = -50, SKULL_Z = 30;
   const pedestal = new THREE.Mesh(
     new THREE.CylinderGeometry(1.2, 1.5, 1.6, 16),
     new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
   );
-  pedestal.position.set(-30, 0.8, 45); pedestal.castShadow = true; scene.add(pedestal);
+  pedestal.position.set(SKULL_X, 0.8, SKULL_Z); pedestal.castShadow = true; scene.add(pedestal);
   const skullBase = new THREE.Mesh(
     new THREE.SphereGeometry(0.85, 16, 14),
     new THREE.MeshStandardMaterial({ color: 0xfff5e0, emissive: 0xc1ff12, emissiveIntensity: 0.4, roughness: 0.4 })
   );
-  skullBase.position.set(-30, 2.5, 45); skullBase.castShadow = true; scene.add(skullBase);
+  skullBase.position.set(SKULL_X, 2.5, SKULL_Z); skullBase.castShadow = true; scene.add(skullBase);
   // Eye sockets (dark spheres slightly inset)
   for (const dx of [-0.28, 0.28]) {
     const eye = new THREE.Mesh(
       new THREE.SphereGeometry(0.16, 10, 8),
       new THREE.MeshStandardMaterial({ color: 0x000, emissive: 0xc1ff12, emissiveIntensity: 1.6 })
     );
-    eye.position.set(-30 + dx, 2.65, 45 + 0.7);
+    eye.position.set(SKULL_X + dx, 2.65, SKULL_Z + 0.7);
     scene.add(eye);
   }
   // HTB nameplate
   const plateLab = makeLabel('HTB', '#c1ff12', 90);
-  plateLab.position.set(-30, 1.3, 45 + 1.55);
+  plateLab.position.set(SKULL_X, 1.3, SKULL_Z + 1.55);
   plateLab.scale.set(0.3, 0.3, 0.3);
   scene.add(plateLab);
 
@@ -1444,6 +1464,9 @@
     [44, 8, 'oak'], [44, 24, 'pine'], [44, -28, 'cherry'],
     [-12, -44, 'pine'], [12, -44, 'oak'], [0, -44, 'cherry'],
     [-32, 48, 'pine'], [0, 48, 'cherry'], [12, 48, 'oak'],
+    // Alpine Village forest backdrop (around cable car station + chalets)
+    [45, 35, 'pine'], [55, 45, 'pine'], [70, 50, 'pine'], [85, 55, 'pine'], [75, 70, 'pine'],
+    [55, 25, 'pine'], [88, 40, 'pine'], [48, 60, 'pine'],
   ];
   for (const [x, z, t] of TREE_SPOTS) addTree(x, z, t);
 
@@ -1493,7 +1516,7 @@
     });
   }
   // Cluster in the park + a couple wandering elsewhere
-  addNPC(parkX - 4, parkZ + 2, 0xff3e8a);
+  addNPC(parkX - 4, parkZ + 2, 0xffb070);
   addNPC(parkX + 3, parkZ - 5, 0x5ce5ff);
   addNPC(parkX - 2, parkZ - 7, 0xffe066);
   addNPC(parkX + 6, parkZ + 4, 0xc1ff12);
@@ -1559,7 +1582,7 @@
   addParkedCar(19, -4, -Math.PI/2, 0x8a3eff);
   addParkedCar(19, -16, -Math.PI/2, 0xff6a3a);
   addParkedCar(-9, -19, 0, 0x5ce5ff);
-  addParkedCar(-29, -2, Math.PI/2, 0xff3e8a);
+  addParkedCar(-29, -2, Math.PI/2, 0xffb070);
   addParkedCar(29, 14, -Math.PI/2, 0xc1ff12);
   addParkedCar(4, 19, Math.PI, 0x6a3aff);
 
@@ -1640,7 +1663,10 @@
     ctx.fillText(text, canvas.width/2, canvas.height/2);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+    // DoubleSide so every label is visible from BOTH front and back of its plane.
+    // Fixes the long-standing issue of signs disappearing when viewed from behind.
+    // Text appears mirrored when viewed from the back, but at least the sign is readable as a marker.
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), mat);
     return mesh;
   }
@@ -2078,6 +2104,192 @@
   const touch = { x: 0, y: 0, jump: false }; // joystick offset -1..1
   let cameraMode = 0; // 0 follow, 1 high, 2 first
 
+  // ─────────────── PLAYER MODE STATE (car / walk / cable_ride / balloon_ride) ───────────────
+  // Drives top-level branching in input, animate, and camera updates.
+  let playerMode = 'car';
+  let rideTarget = null;        // for ride modes — the object the camera follows (gondola, balloon)
+
+  // ─────────────── 🚶 WALKING MAN AVATAR (toggle with M near flyover) ───────────────
+  const manGroup = new THREE.Group();
+  // Body (capsule-like — cylinder + 2 hemispheres approximated as cylinder + sphere)
+  const manBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32, 0.32, 1.0, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3a5e8c, roughness: 0.7 })
+  );
+  manBody.position.y = 1.0;
+  manBody.castShadow = true;
+  manGroup.add(manBody);
+  // Head
+  const manHead = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0xf2c8a0, roughness: 0.85 })
+  );
+  manHead.position.y = 1.85;
+  manHead.castShadow = true;
+  manGroup.add(manHead);
+  // Hair cap (small dark dome)
+  const manHair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.30, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.4),
+    new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.9 })
+  );
+  manHair.position.y = 1.92;
+  manGroup.add(manHair);
+  // Two arms
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10, 0.10, 0.7, 8),
+      new THREE.MeshStandardMaterial({ color: 0xf2c8a0, roughness: 0.8 })
+    );
+    arm.position.set(sx * 0.42, 1.15, 0);
+    arm.castShadow = true;
+    manGroup.add(arm);
+  }
+  // Two legs
+  const manLegs = [];
+  for (const sx of [-1, 1]) {
+    const leg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 0.85, 8),
+      new THREE.MeshStandardMaterial({ color: 0x202028, roughness: 0.85 })
+    );
+    leg.position.set(sx * 0.18, 0.42, 0);
+    leg.castShadow = true;
+    manGroup.add(leg);
+    manLegs.push(leg);
+  }
+  manGroup.visible = false;
+  scene.add(manGroup);
+
+  // Walk physics state
+  let walkYaw = 0;
+  const walkSpeed = 6.0;        // m/s
+  const walkRunSpeed = 11.0;    // shift to run
+  let walkTime = 0;             // for leg-bobbing animation
+
+  function enterWalkMode() {
+    if (playerMode !== 'car') return;
+    playerMode = 'walk';
+    manGroup.position.set(carGroup.position.x + 2, 0, carGroup.position.z);
+    manGroup.visible = true;
+    walkYaw = yaw;
+    if (window.__imranToast) window.__imranToast('🚶 Walking mode — WASD to walk · M to drive');
+  }
+  function exitWalkMode() {
+    if (playerMode !== 'walk') return;
+    playerMode = 'car';
+    manGroup.visible = false;
+    // Snap car next to where the man was
+    chassis.position.set(manGroup.position.x + 2, 1.5, manGroup.position.z);
+    chassis.velocity.set(0, 0, 0);
+    chassis.angularVelocity.set(0, 0, 0);
+    if (window.__imranToast) window.__imranToast('🏎️ Driving mode resumed');
+  }
+  function enterRideMode(target, kind) {
+    if (playerMode !== 'walk' && playerMode !== 'car') return;
+    playerMode = (kind === 'cable') ? 'cable_ride' : 'balloon_ride';
+    rideTarget = target;
+    manGroup.visible = false;
+    // For balloon: kick off a 60-sec tour animation that takes off, flies the world, and lands
+    if (kind === 'balloon') {
+      target.userData.rideTour = {
+        t: 0,
+        duration: 60,
+        homeX: target.position.x,
+        homeY: target.position.y,
+        homeZ: target.position.z,
+      };
+      if (window.__imranToast) window.__imranToast('🎈 Taking off — 60s tour · press <kbd>M</kbd> to land early');
+    } else {
+      if (window.__imranToast) window.__imranToast('🚠 Cable car ride · press <kbd>M</kbd> to exit');
+    }
+  }
+  function exitRideMode() {
+    if (playerMode !== 'cable_ride' && playerMode !== 'balloon_ride') return;
+    // If we exit the balloon mid-tour, snap it back to its home pad
+    if (playerMode === 'balloon_ride' && rideTarget && rideTarget.userData.rideTour) {
+      const h = rideTarget.userData.rideTour;
+      rideTarget.position.set(h.homeX, h.homeY, h.homeZ);
+      rideTarget.userData.rideTour = null;
+    }
+    rideTarget = null;
+    // Drop player back on the ground next to the car (so they can re-enter easily)
+    playerMode = 'walk';
+    manGroup.visible = true;
+    manGroup.position.set(carGroup.position.x + 2, 0, carGroup.position.z);
+    if (window.__imranToast) window.__imranToast('🚶 Back on foot · E near car to drive · M anywhere to drive');
+  }
+  // Expose for external use
+  window.__imranPlayer = { enterWalk: enterWalkMode, exitWalk: exitWalkMode, getMode: () => playerMode };
+
+  // Surface-height query — returns the y of the walkable surface at (x, z).
+  // Knows about the flyover (ramps + flat span at z≈0) and the cable car ramp + deck.
+  // Default = ground level (0). Lets the walking man climb the bridge instead of clipping through it.
+  function getGroundY(x, z) {
+    // Flyover (centered at z=0, ±2.5m wide) — west ramp x=24..42, span x=42..58, east ramp x=58..76
+    const FLY_H_LOCAL = 3.5;
+    if (Math.abs(z) < 2.6) {
+      if (x >= 24 && x <= 42) return ((x - 24) / 18) * FLY_H_LOCAL;       // west ramp ascends
+      if (x > 42 && x < 58)   return FLY_H_LOCAL;                          // flat span
+      if (x >= 58 && x <= 76) return FLY_H_LOCAL - ((x - 58) / 18) * FLY_H_LOCAL;  // east ramp descends
+    }
+    // Cable car STAIRS — 22 steps × 1m run from z=2.5 (deck edge) backward to z=-19.5 (foot)
+    // Smooth incline approximation for walking — rises 0→11 over 22m
+    const stairBottomZ = 24.5 - 22 * 1.0;     // = 2.5
+    const stairTopZ = 24.5;                   // wait — recompute: STATION_Z=30, stairTopZ = STATION_Z - 5.5 = 24.5
+    if (Math.abs(x - 40) < 2.7) {
+      if (z >= stairBottomZ && z <= stairTopZ) {
+        const t = (z - stairBottomZ) / (stairTopZ - stairBottomZ);
+        return t * 11;
+      }
+    }
+    // Cable car deck — 11×11 platform centered at (40, 11.5, 30)
+    if (Math.abs(x - 40) < 5.6 && z >= stairTopZ && z <= 35.5) return 11.5;
+    return 0;
+  }
+
+  // Walk physics — direct position integration, no Cannon body. Returns drv-like obj.
+  function walkStep(dt) {
+    let mx = 0, mz = 0;
+    if (keys.f) mz -= 1;
+    if (keys.b) mz += 1;
+    if (keys.l) mx -= 1;
+    if (keys.r) mx += 1;
+    const len = Math.hypot(mx, mz);
+    if (len > 0) { mx /= len; mz /= len; }
+    const speed = (keys.jump ? walkRunSpeed : walkSpeed);
+    // Movement is in world space relative to the camera yaw (so W always = away from cam)
+    const camFwdX = -Math.sin(walkYaw);
+    const camFwdZ = -Math.cos(walkYaw);
+    const camRightX = -camFwdZ;
+    const camRightZ = camFwdX;
+    const vx = (camFwdX * (-mz) + camRightX * mx) * speed;
+    const vz = (camFwdZ * (-mz) + camRightZ * mx) * speed;
+    manGroup.position.x += vx * dt;
+    manGroup.position.z += vz * dt;
+    // Surface snap — find ground level under the man and lerp y up to it
+    const targetY = getGroundY(manGroup.position.x, manGroup.position.z);
+    // Smooth vertical movement so stepping onto/off ramps doesn't pop
+    manGroup.position.y += (targetY - manGroup.position.y) * Math.min(1, dt * 14);
+    // Face direction of movement
+    if (len > 0) {
+      const targetYaw = Math.atan2(vx, vz);
+      let dy = targetYaw - manGroup.rotation.y;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      manGroup.rotation.y += dy * Math.min(1, dt * 12);
+    }
+    // Walk bobbing — legs swing, body bobs (added to surface y)
+    walkTime += dt * (len > 0 ? 6 : 0);
+    if (len > 0) {
+      manLegs[0].rotation.x = Math.sin(walkTime) * 0.6;
+      manLegs[1].rotation.x = -Math.sin(walkTime) * 0.6;
+      manGroup.position.y += Math.abs(Math.sin(walkTime * 2)) * 0.05;
+    } else {
+      manLegs[0].rotation.x *= 0.9;
+      manLegs[1].rotation.x *= 0.9;
+    }
+    return { speed: Math.hypot(vx, vz), throttle: len > 0 ? 1 : 0 };
+  }
+
   const keyMap = {
     'ArrowUp': 'f', 'KeyW': 'f',
     'ArrowDown': 'b', 'KeyS': 'b',
@@ -2105,6 +2317,12 @@
     if (e.code === 'KeyH') Sound.honk();
     if (e.code === 'KeyL') toggleFlyMode();        // takeoff / land
     if (e.code === 'KeyY') toggleDayNightAuto();   // freeze/resume day-night cycle
+    // M — escape hatch: exits any ride immediately and toggles between car ↔ walk
+    if (e.code === 'KeyM') {
+      if (playerMode === 'cable_ride' || playerMode === 'balloon_ride') exitRideMode();
+      else if (playerMode === 'car') enterWalkMode();
+      else if (playerMode === 'walk') exitWalkMode();
+    }
     // Project billboard cycling — only meaningful when active zone is 'projects'
     if ((e.code === 'KeyN' || e.code === 'BracketRight') && activeZone && activeZone.key === 'projects') {
       window.__imranProjectCycle(+1);
@@ -2114,11 +2332,35 @@
     }
     if (e.code === 'KeyE' || e.code === 'Enter') {
       window.__imranEHeld = true;            // for bunker easter-egg hold detection
+      // If walking and near the car (within 5m), enter the car
+      if (playerMode === 'walk' && Math.hypot(
+          manGroup.position.x - carGroup.position.x,
+          manGroup.position.z - carGroup.position.z) < 5) {
+        exitWalkMode();
+      }
+      // If on a balloon ride pad, enter balloon ride (E to enter, M to exit)
+      else if (activeZone && activeZone.key === 'balloon_ride_pad' && activeZone.rideTarget
+               && playerMode !== 'balloon_ride' && playerMode !== 'cable_ride') {
+        enterRideMode(activeZone.rideTarget, 'balloon');
+      }
       // If on the projects pad, open the currently displayed project
-      if (activeZone && activeZone.key === 'projects') {
+      else if (activeZone && activeZone.key === 'projects') {
         window.__imranProjectOpen();
       } else {
         window.dispatchEvent(new Event('imran:interact'));
+      }
+    }
+    // R key — ride the cable car (only when on/near the station deck)
+    if (e.code === 'KeyT' && playerMode !== 'cable_ride') {
+      // Distance from station deck top
+      const stationDeckPos = window.__imranSwiss && window.__imranSwiss.gondola;
+      if (stationDeckPos) {
+        const px = (playerMode === 'walk') ? manGroup.position.x : carGroup.position.x;
+        const pz = (playerMode === 'walk') ? manGroup.position.z : carGroup.position.z;
+        // STATION_X=40, STATION_Z=30
+        if (Math.hypot(px - 40, pz - 30) < 18) {
+          enterRideMode(window.__imranSwiss.gondola, 'cable');
+        }
       }
     }
   });
@@ -2245,17 +2487,25 @@
     if (keys.b) thrust -= 0.6;
     if (keys.l) yawIn += 1;
     if (keys.r) yawIn -= 1;
-    if (keys.jump) alt += 1;            // Space = climb
+    if (keys.jump) alt += 1;                 // Space = climb
+    if (keys.dive || window.__imranShiftDown) alt -= 1;   // Shift = dive
     // Touch joystick: forward = throttle, side = yaw
     if (Math.abs(touch.y) > 0.15) thrust -= touch.y;
     if (Math.abs(touch.x) > 0.15) yawIn -= touch.x;
 
     // Smooth speed
-    flySpeed = Math.max(2, Math.min(30, flySpeed + thrust * 12 * dt));
-    flySpeed *= 0.985;     // slight drag so it doesn't stay at max
+    flySpeed = Math.max(2, Math.min(35, flySpeed + thrust * 14 * dt));
+    flySpeed *= 0.985;
     yaw += yawIn * 1.4 * dt;
-    // Climb / passive descent
-    flyAlt = Math.max(5, Math.min(70, flyAlt + alt * 18 * dt - dt * 1.4));
+    // Climb (Space) / dive (Shift) — wider altitude range so we go ABOVE mountains (~40m peaks)
+    // Without input, plane gently descends back toward 30 (cruising altitude)
+    const restAlt = 30;
+    if (alt !== 0) {
+      flyAlt = Math.max(5, Math.min(85, flyAlt + alt * 22 * dt));
+    } else {
+      // gentle drift back to cruise altitude when no input
+      flyAlt += (restAlt - flyAlt) * dt * 0.3;
+    }
 
     // Apply position + rotation
     const fx = -Math.sin(yaw);
@@ -2265,13 +2515,17 @@
     chassis.position.y = flyAlt;
     chassis.velocity.set(0, 0, 0);
     chassis.angularVelocity.set(0, 0, 0);
-    // Bank into turns (slight roll)
+    // Real plane attitude — pitch (nose up/down based on climb), roll (bank into turns)
+    const pitch = -alt * 0.35;            // climb = nose up; dive = nose down
     const bankRoll = -yawIn * 0.35;
     const qYaw = new CANNON.Quaternion();
     qYaw.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), yaw);
+    const qPitch = new CANNON.Quaternion();
+    qPitch.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), pitch);
     const qRoll = new CANNON.Quaternion();
     qRoll.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), bankRoll);
-    chassis.quaternion.copy(qYaw.mult(qRoll));
+    // Compose: yaw * pitch * roll
+    chassis.quaternion.copy(qYaw.mult(qPitch).mult(qRoll));
     // Animate wings up
     wingScale = Math.min(1, wingScale + dt * 4);
     wings.scale.set(wingScale, wingScale, wingScale);
@@ -2301,7 +2555,7 @@
   }
   function setRemotePlayers(playerList) {
     const seen = new Set();
-    const palette = [0xff3e8a, 0x5ce5ff, 0x8a3eff, 0xffe066, 0xc1ff12, 0xff9b3e];
+    const palette = [0xffb070, 0x5ce5ff, 0x8a3eff, 0xffe066, 0xc1ff12, 0xff9b3e];
     for (const p of playerList) {
       seen.add(p.id);
       let entry = remotePlayers.get(p.id);
@@ -2359,6 +2613,10 @@
       if (chassis.wakeUp) chassis.wakeUp();
       if (window.imranSound) window.imranSound.click();
     },
+    // Visitor Tower data sink — Portfolio.html calls this with server-fetched stats
+    setVisitData: (data) => {
+      if (window.__imranSetVisitData) window.__imranSetVisitData(data);
+    },
   };
 
   let lastJump = 0;
@@ -2415,12 +2673,18 @@
       chassis.velocity.x *= dragFactor;
       chassis.velocity.z *= dragFactor;
 
-      // Clamp top speed
+      // Clamp top speed — slower off-road (NFS Most Wanted style)
       const sp = Math.hypot(chassis.velocity.x, chassis.velocity.z);
-      const MAX = 22;
+      const offRoad = window.__imranIsOnRoad ? !window.__imranIsOnRoad(chassis.position.x, chassis.position.z) : false;
+      const MAX = offRoad ? 18 : 22;
       if (sp > MAX) {
         chassis.velocity.x *= MAX/sp;
         chassis.velocity.z *= MAX/sp;
+      }
+      // Off-road also adds extra forward drag (mud/grass resistance)
+      if (offRoad) {
+        chassis.velocity.x *= 0.992;
+        chassis.velocity.z *= 0.992;
       }
       // Jump
       if (jump && performance.now() - lastJump > 700) {
@@ -2527,15 +2791,1706 @@
   keystone.position.set(0, 11.0, 12);
   keystone.castShadow = true;
   archGroup.add(keystone);
-  const archLabel = makeLabel('imran .', '#ff3e8a', 130);
+  // Welcome arch label — fixed in place (NOT camera-billboarded) so it stays painted on the keystone
+  const archLabel = makeLabel('imran pasha', '#ffb070', 130);
   archLabel.position.set(0, 11.0, 12.42);
-  archLabel.scale.set(1.0, 1.0, 1.0);
+  archLabel.scale.set(0.85, 0.85, 0.85);
+  archLabel.userData.noBillboard = true;
   archGroup.add(archLabel);
+  // Mirror copy on the back face so the label reads from both sides
+  const archLabelBack = makeLabel('imran pasha', '#ffb070', 130);
+  archLabelBack.position.set(0, 11.0, 11.58);
+  archLabelBack.scale.set(0.85, 0.85, 0.85);
+  archLabelBack.rotation.y = Math.PI;
+  archLabelBack.userData.noBillboard = true;
+  archGroup.add(archLabelBack);
   // Spotlights pointed at the arch from underneath for drama
   const archSpot = new THREE.PointLight(COL.pink, 1.4, 30, 2);
   archSpot.position.set(0, 8, 12);
   archGroup.add(archSpot);
   scene.add(archGroup);
+
+  // ─────────────── 🏛️ WELCOME PLAZA (cobblestone disc + 4 directional signposts) ───────────────
+  // Civic plaza framing the spawn area — gives the player wayfinding before they drive off.
+  // Cobblestone floor disc under the spawn pad, just slightly raised above grass.
+  const plazaFloor = new THREE.Mesh(
+    new THREE.CircleGeometry(11, 48),
+    new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 0.95, metalness: 0 })
+  );
+  plazaFloor.rotation.x = -Math.PI / 2;
+  plazaFloor.position.set(0, 0.03, 0);
+  plazaFloor.receiveShadow = true;
+  scene.add(plazaFloor);
+  // 4 cardinal directional signposts at radius 14 from spawn — the master organizing principle
+  // (each points the player toward a distinct district, telegraphed by visual landmarks)
+  function addSignpost(x, z, text, faceY) {
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 4.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+    );
+    post.position.set(x, 2.1, z);
+    post.castShadow = true;
+    scene.add(post);
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(5.2, 0.9, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.8 })
+    );
+    board.position.set(x, 4.1, z);
+    board.rotation.y = faceY;
+    board.castShadow = true;
+    scene.add(board);
+    const lab = makeLabel(text, '#ffe066', 70);
+    lab.position.set(x, 4.1, z);
+    lab.rotation.y = faceY;
+    lab.scale.set(0.4, 0.4, 0.4);
+    // Push label slightly forward of the board so it doesn't z-fight
+    lab.position.x += Math.sin(faceY) * 0.07;
+    lab.position.z += Math.cos(faceY) * 0.07;
+    lab.userData.noBillboard = true;
+    scene.add(lab);
+    // Mirror copy facing the opposite way
+    const labBack = makeLabel(text, '#ffe066', 70);
+    labBack.position.set(x, 4.1, z);
+    labBack.rotation.y = faceY + Math.PI;
+    labBack.scale.set(0.4, 0.4, 0.4);
+    labBack.position.x -= Math.sin(faceY) * 0.07;
+    labBack.position.z -= Math.cos(faceY) * 0.07;
+    labBack.userData.noBillboard = true;
+    scene.add(labBack);
+  }
+  // North → Social Boulevard (face oncoming car, i.e. board faces +z)
+  addSignpost(-2, 14, '↑ SOCIAL BLVD', Math.PI);
+  // South → Mailroom & Tunnel
+  addSignpost(2, -14, '↓ MAILROOM · PARK', 0);
+  // East → Tech Park / Alpine Village
+  addSignpost(14, -2, '→ TECH PARK · ALPINE VILLAGE', -Math.PI / 2);
+  // West → Hacker's Den
+  addSignpost(-14, 2, '← HACKER\'S DEN', Math.PI / 2);
+
+  // ─────────────── 🏛️ VISITOR TOWER (live count + scrolling guestbook) ───────────────
+  // Tall obelisk near the welcome arch with a giant glowing scoreboard at the top
+  // and a scrolling LED ticker below showing recent visits. Server-driven via
+  // window.imranWorld.setVisitData({total, unique, recent}).
+  const vTowerGroup = new THREE.Group();
+  const towerX = 15, towerZ = 8;
+
+  // Stone pedestal base (cylinder)
+  const towerBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 2.6, 1.2, 16),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.85 })
+  );
+  towerBase.position.y = 0.6;
+  towerBase.castShadow = true;
+  vTowerGroup.add(towerBase);
+
+  // Pedestal label "👀 VISITORS"
+  const towerBaseLab = makeLabel('👀 VISITORS', '#3E2418', 110);
+  towerBaseLab.position.set(0, 1.3, 2.3);
+  towerBaseLab.scale.set(0.6, 0.6, 0.6);
+  vTowerGroup.add(towerBaseLab);
+
+  // Shorter obelisk shaft (was 14m, now 7m — feels less imposing)
+  const towerShaft = new THREE.Mesh(
+    new THREE.BoxGeometry(2.0, 7, 2.0),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a48, roughness: 0.7, metalness: 0.1 })
+  );
+  towerShaft.position.y = 1.2 + 3.5;
+  towerShaft.castShadow = true;
+  vTowerGroup.add(towerShaft);
+
+  // Horizontal grooves (3 instead of 5, scaled to new shorter shaft)
+  for (let i = 0; i < 3; i++) {
+    const groove = new THREE.Mesh(
+      new THREE.BoxGeometry(2.05, 0.08, 2.05),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+    );
+    groove.position.y = 2.5 + i * 2.0;
+    vTowerGroup.add(groove);
+  }
+
+  // The big glowing scoreboard panel — moved down to fit shorter tower
+  const towerScreenW = 4.5, towerScreenH = 2.2;
+  const towerScreenY = 7.5;
+  const towerScreenCanvas = document.createElement('canvas');
+  towerScreenCanvas.width = 640; towerScreenCanvas.height = 320;
+  const towerScreenCtx = towerScreenCanvas.getContext('2d');
+  const towerScreenTex = new THREE.CanvasTexture(towerScreenCanvas);
+  towerScreenTex.colorSpace = THREE.SRGBColorSpace;
+  const towerScreenMat = new THREE.MeshStandardMaterial({
+    map: towerScreenTex,
+    emissive: 0xffb070, emissiveIntensity: 0.9,
+    roughness: 0.4,
+  });
+  const towerScreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(towerScreenW, towerScreenH),
+    towerScreenMat
+  );
+  towerScreen.position.set(0, towerScreenY, 1.05);    // protrudes from front face
+  vTowerGroup.add(towerScreen);
+  // Backside copy so the count reads from the other direction too
+  const towerScreenBack = new THREE.Mesh(
+    new THREE.PlaneGeometry(towerScreenW, towerScreenH),
+    towerScreenMat
+  );
+  towerScreenBack.position.set(0, towerScreenY, -1.05);
+  towerScreenBack.rotation.y = Math.PI;
+  vTowerGroup.add(towerScreenBack);
+
+  // Scrolling guestbook ticker below the main display (smaller panel)
+  const towerTickerCanvas = document.createElement('canvas');
+  towerTickerCanvas.width = 640; towerTickerCanvas.height = 160;
+  const towerTickerCtx = towerTickerCanvas.getContext('2d');
+  const towerTickerTex = new THREE.CanvasTexture(towerTickerCanvas);
+  towerTickerTex.colorSpace = THREE.SRGBColorSpace;
+  const towerTickerMat = new THREE.MeshStandardMaterial({
+    map: towerTickerTex, emissive: 0x5ce5ff, emissiveIntensity: 0.5, roughness: 0.4,
+  });
+  const towerTicker = new THREE.Mesh(
+    new THREE.PlaneGeometry(towerScreenW, 1.4),
+    towerTickerMat
+  );
+  towerTicker.position.set(0, towerScreenY - 2.3, 1.05);
+  vTowerGroup.add(towerTicker);
+  const towerTickerBack = new THREE.Mesh(
+    new THREE.PlaneGeometry(towerScreenW, 1.4),
+    towerTickerMat
+  );
+  towerTickerBack.position.set(0, towerScreenY - 2.3, -1.05);
+  towerTickerBack.rotation.y = Math.PI;
+  vTowerGroup.add(towerTickerBack);
+
+  // Top accent — rotating amber crystal (octahedron)
+  const towerCrystal = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.7, 0),
+    new THREE.MeshStandardMaterial({
+      color: 0xffb070, emissive: 0xff8a6e, emissiveIntensity: 1.4,
+      roughness: 0.2, metalness: 0.6, transparent: true, opacity: 0.9,
+    })
+  );
+  towerCrystal.position.y = 9.5;       // sits on top of shorter shaft
+  towerCrystal.castShadow = true;
+  vTowerGroup.add(towerCrystal);
+
+  // Pulsing point light at scoreboard height
+  const towerLight = new THREE.PointLight(0xffb070, 1.6, 30, 2);
+  towerLight.position.set(0, towerScreenY, 0);
+  vTowerGroup.add(towerLight);
+
+  vTowerGroup.position.set(towerX, 0, towerZ);
+  scene.add(vTowerGroup);
+
+  // Visit data state + drawer
+  let visitState = { total: 0, unique: 0, recent: [], lastTotal: 0, plusOneT: 0 };
+  function drawTowerScreen() {
+    const c = towerScreenCtx;
+    c.clearRect(0, 0, 640, 320);
+    // Dark amber screen background
+    c.fillStyle = '#1a1208';
+    c.fillRect(0, 0, 640, 320);
+    // Scanlines for retro LED feel
+    c.fillStyle = 'rgba(255, 176, 112, 0.08)';
+    for (let y = 0; y < 320; y += 4) c.fillRect(0, y, 640, 1);
+    // The big number
+    const countStr = String(visitState.total).padStart(5, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    c.font = 'bold 160px "JetBrains Mono", monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = '#ffe066';
+    c.shadowColor = '#ffb070'; c.shadowBlur = 32;
+    c.fillText(countStr, 320, 140);
+    c.shadowBlur = 0;
+    // Subtitle
+    c.font = '32px "JetBrains Mono", monospace';
+    c.fillStyle = '#5ce5ff';
+    c.fillText(`${visitState.unique} unique`, 320, 250);
+    // Caption
+    c.font = '24px "Permanent Marker", cursive';
+    c.fillStyle = '#ffb070';
+    c.fillText('TOTAL VISITS', 320, 295);
+    // +1 floating animation when count just incremented
+    if (visitState.plusOneT > 0) {
+      const a = visitState.plusOneT;
+      c.globalAlpha = a;
+      c.font = 'bold 60px "Permanent Marker", cursive';
+      c.fillStyle = '#7bc04a';
+      c.fillText('+1', 540, 80 - (1 - a) * 40);
+      c.globalAlpha = 1;
+    }
+    towerScreenTex.needsUpdate = true;
+  }
+  let tickerScroll = 0;
+  function drawTowerTicker() {
+    const c = towerTickerCtx;
+    c.clearRect(0, 0, 640, 160);
+    c.fillStyle = '#0a1426';
+    c.fillRect(0, 0, 640, 160);
+    // Cyan scanlines
+    c.fillStyle = 'rgba(92, 229, 255, 0.06)';
+    for (let y = 0; y < 160; y += 3) c.fillRect(0, y, 640, 1);
+    // Header
+    c.font = '20px "Permanent Marker", cursive';
+    c.fillStyle = '#5ce5ff';
+    c.textAlign = 'left';
+    c.fillText('· LIVE GUESTBOOK ·', 12, 22);
+    // Lines (scroll vertically, infinite loop)
+    c.font = '18px "JetBrains Mono", monospace';
+    const lineH = 24;
+    const lines = visitState.recent.slice(0, 30).map(r => {
+      const ago = secsAgo(r.ts);
+      const tag = r.isNew ? '🌟' : '👋';
+      return `${tag}  visitor #${r.short}  ·  ${ago}`;
+    });
+    if (lines.length === 0) lines.push('   waiting for first visit...');
+    const startY = 50 - (tickerScroll % (lines.length * lineH));
+    for (let i = 0; i < lines.length * 2; i++) {     // draw twice for seamless loop
+      const y = startY + i * lineH;
+      if (y < -lineH || y > 200) continue;
+      c.fillStyle = i < lines.length ? '#9ce6ff' : '#5cb8d9';
+      c.fillText(lines[i % lines.length], 14, y);
+    }
+    towerTickerTex.needsUpdate = true;
+  }
+  function secsAgo(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    if (s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+  }
+  drawTowerScreen();
+  drawTowerTicker();
+
+  // Public API — Portfolio.html calls this with server data
+  window.__imranSetVisitData = function (data) {
+    if (typeof data.total === 'number') {
+      const newCount = data.total > visitState.lastTotal && visitState.lastTotal > 0;
+      visitState.lastTotal = visitState.total;
+      visitState.total = data.total;
+      if (newCount) visitState.plusOneT = 1.0;       // trigger +1 animation
+    }
+    if (typeof data.unique === 'number') visitState.unique = data.unique;
+    drawTowerScreen();
+    // Also fetch fresh recent visits for the ticker
+    fetch('/api/visits/recent?limit=30')
+      .then(r => r.json())
+      .then(d => {
+        visitState.recent = d.recent || [];
+        drawTowerTicker();
+      })
+      .catch(() => {});
+  };
+
+  // Animate crystal + +1 fade in tick loop (hooked later via window flag)
+  window.__imranTowerAnim = { crystal: towerCrystal, light: towerLight, state: visitState, draw: drawTowerScreen, drawTicker: drawTowerTicker };
+
+  // ─────────────── 🏔️ SWITZERLAND — mountain ring + alpine atmosphere ───────────────
+  const swissMountains = new THREE.Group();
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 0.95, flatShading: true });
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xf2f2ff, roughness: 0.7, emissive: 0xddddff, emissiveIntensity: 0.04 });
+  // Bigger world — mountain ring pushed way out so airport (~177m corner) + harbour (~230m corner) fit
+  const RING_R = 280;
+  const MOUNTAIN_COUNT = 52;
+  let highestPeak = { x: 0, y: 0, z: 0 };
+  for (let i = 0; i < MOUNTAIN_COUNT; i++) {
+    const ang = (i / MOUNTAIN_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+    const r = RING_R + (Math.random() - 0.5) * 18;       // jitter the radius
+    const mx = Math.cos(ang) * r;
+    const mz = Math.sin(ang) * r;
+    const baseR = 12 + Math.random() * 14;               // 12-26m wide
+    const baseH = 22 + Math.random() * 18;               // 22-40m tall
+    // Rock cone (base)
+    const rock = new THREE.Mesh(
+      new THREE.ConeGeometry(baseR, baseH, 6 + Math.floor(Math.random() * 3), 1),
+      rockMat
+    );
+    rock.position.set(mx, baseH / 2, mz);
+    rock.rotation.y = Math.random() * Math.PI * 2;
+    rock.castShadow = true;
+    swissMountains.add(rock);
+    // Snow cap (smaller cone on top, ~50% of base height, narrower)
+    const snowH = baseH * 0.45;
+    const snowR = baseR * 0.65;
+    const snow = new THREE.Mesh(
+      new THREE.ConeGeometry(snowR, snowH, 6, 1),
+      snowMat
+    );
+    snow.position.set(mx, baseH - 0.5, mz);
+    snow.rotation.y = rock.rotation.y;
+    snow.castShadow = true;
+    swissMountains.add(snow);
+    // Track the highest peak for cable car target
+    const peakY = baseH;
+    if (peakY > highestPeak.y) highestPeak = { x: mx, y: peakY, z: mz };
+  }
+  scene.add(swissMountains);
+
+  // ─── Mountain boundary walls (invisible — car can't escape the ring) ───
+  // 24 tall thin physics boxes arranged in a ring at radius 100, each rotated to face inward.
+  // Tall enough (50m) that even plane-mode can't sneak over them at moderate altitudes.
+  const BOUNDARY_R = 250;
+  const BOUNDARY_SEGMENTS = 48;
+  const boundarySegWidth = (2 * Math.PI * BOUNDARY_R) / BOUNDARY_SEGMENTS * 1.1;   // slight overlap at seams
+  for (let i = 0; i < BOUNDARY_SEGMENTS; i++) {
+    const ang = (i / BOUNDARY_SEGMENTS) * Math.PI * 2;
+    const wx = Math.cos(ang) * BOUNDARY_R;
+    const wz = Math.sin(ang) * BOUNDARY_R;
+    const wallBody = new CANNON.Body({ mass: 0, material: groundMat });
+    wallBody.addShape(new CANNON.Box(new CANNON.Vec3(boundarySegWidth/2, 25, 1)));
+    wallBody.position.set(wx, 25, wz);
+    // Rotate so the wall's long axis is tangent to the circle (perpendicular to radial direction)
+    wallBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), -ang + Math.PI/2);
+    world.addBody(wallBody);
+  }
+
+  // ─── Cable car STATION + drivable ramp up to the top deck ───
+  // Replaces the old skinny pole with a proper alpine-station building.
+  // The car can drive UP a long gentle ramp to the top deck where the cable wire originates.
+  const STATION_X = 40, STATION_Z = 30, STATION_H = 11;
+  // Cable wire now starts from the top of the station's deck
+  const cableStart = new THREE.Vector3(STATION_X, STATION_H + 1.5, STATION_Z);
+  const cableEnd = new THREE.Vector3(highestPeak.x, highestPeak.y * 0.55, highestPeak.z);
+
+  // Station main body — wood-clad alpine building
+  const stationBody = new THREE.Mesh(
+    new THREE.BoxGeometry(8, STATION_H, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.8 })
+  );
+  stationBody.position.set(STATION_X, STATION_H / 2, STATION_Z);
+  stationBody.castShadow = true; stationBody.receiveShadow = true;
+  scene.add(stationBody);
+  // Station physics body — solid box car can collide with
+  const stationBodyPhys = new CANNON.Body({ mass: 0, material: groundMat });
+  stationBodyPhys.addShape(new CANNON.Box(new CANNON.Vec3(4, STATION_H / 2, 4)));
+  stationBodyPhys.position.set(STATION_X, STATION_H / 2, STATION_Z);
+  world.addBody(stationBodyPhys);
+  // Top deck — wider, drivable platform
+  const stationDeck = new THREE.Mesh(
+    new THREE.BoxGeometry(11, 0.5, 11),
+    new THREE.MeshStandardMaterial({ color: 0x6a4828, roughness: 0.8 })
+  );
+  stationDeck.position.set(STATION_X, STATION_H + 0.25, STATION_Z);
+  stationDeck.castShadow = true; stationDeck.receiveShadow = true;
+  scene.add(stationDeck);
+  const stationDeckPhys = new CANNON.Body({ mass: 0, material: groundMat });
+  stationDeckPhys.addShape(new CANNON.Box(new CANNON.Vec3(5.5, 0.25, 5.5)));
+  stationDeckPhys.position.set(STATION_X, STATION_H + 0.25, STATION_Z);
+  world.addBody(stationDeckPhys);
+  // Deck railings (cyan glow, 3 sides — not the side the ramp arrives from)
+  for (const side of ['+x', '-x', '+z']) {
+    const w = (side === '+z') ? 11 : 0.18;
+    const d = (side === '+z') ? 0.18 : 11;
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(w, 0.6, d),
+      new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.5 })
+    );
+    const offX = side === '+x' ? 5.5 : (side === '-x' ? -5.5 : 0);
+    const offZ = side === '+z' ? 5.5 : 0;
+    rail.position.set(STATION_X + offX, STATION_H + 0.85, STATION_Z + offZ);
+    scene.add(rail);
+  }
+  // Roof / shelter over part of the deck (cable wire emerges from under it)
+  const stationRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(7, 0.3, 4),
+    new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+  );
+  stationRoof.position.set(STATION_X, STATION_H + 3, STATION_Z + 2);
+  stationRoof.castShadow = true;
+  scene.add(stationRoof);
+  // 4 roof support pillars
+  for (const [px, pz] of [[-3, 0], [3, 0], [-3, 4], [3, 4]]) {
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, 2.7, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+    );
+    pillar.position.set(STATION_X + px, STATION_H + 1.65, STATION_Z + pz);
+    scene.add(pillar);
+  }
+  // "CABLE CAR" label on the front face of the station
+  const stationLab = makeLabel('CABLE CAR', '#ffe066', 110);
+  stationLab.position.set(STATION_X, STATION_H - 1.5, STATION_Z - 4.05);
+  stationLab.scale.set(0.6, 0.6, 0.6);
+  stationLab.userData.noBillboard = true;
+  scene.add(stationLab);
+  const stationLabBack = makeLabel('CABLE CAR', '#ffe066', 110);
+  stationLabBack.position.set(STATION_X, STATION_H - 1.5, STATION_Z + 4.05);
+  stationLabBack.scale.set(0.6, 0.6, 0.6);
+  stationLabBack.rotation.y = Math.PI;
+  stationLabBack.userData.noBillboard = true;
+  scene.add(stationLabBack);
+
+  // ─── Stairs UP to the station deck (walk-only, replaces the old drivable ramp) ───
+  // Stack of N step boxes from z=-17.5 (foot) to z=24.5 (deck), rising to STATION_H=11.
+  // Each step: 0.5m rise, ~1.0m run. Total: 22 steps, 22m of horizontal run.
+  const RAMP_LEN = 42;          // kept for compatibility with sign position calc
+  const STAIR_COUNT = 22;
+  const STAIR_RUN = 1.0;
+  const STAIR_RISE = STATION_H / STAIR_COUNT;       // 0.5m per step
+  const STAIR_WIDTH = 5;
+  const stairFootZ = STATION_Z - 5.5 - STAIR_COUNT * STAIR_RUN;     // z=2.5 ish — actually let me recompute below
+  // Reposition stair foot so the deck-side step is at the deck edge (STATION_Z - 5.5)
+  const stairTopZ = STATION_Z - 5.5;
+  const stairBottomZ = stairTopZ - STAIR_COUNT * STAIR_RUN;
+  const stairMat = new THREE.MeshStandardMaterial({ color: 0x6e6878, roughness: 0.85 });
+  const stairTreadMat = new THREE.MeshStandardMaterial({ color: 0x4a4458, roughness: 0.9, emissive: 0x1a1828, emissiveIntensity: 0.1 });
+  for (let i = 0; i < STAIR_COUNT; i++) {
+    // Step i: top surface at y = (i+1) * STAIR_RISE, occupies z = bottom + i*RUN to bottom + (i+1)*RUN
+    const stepY = (i + 0.5) * STAIR_RISE;
+    const stepZ = stairBottomZ + (i + 0.5) * STAIR_RUN;
+    // Riser (vertical face)
+    const riser = new THREE.Mesh(
+      new THREE.BoxGeometry(STAIR_WIDTH, STAIR_RISE * 0.95, STAIR_RUN * 0.05),
+      stairMat
+    );
+    riser.position.set(STATION_X, stepY, stepZ - STAIR_RUN / 2);
+    riser.castShadow = true;
+    scene.add(riser);
+    // Tread (horizontal surface — also acts as the walkable top)
+    const tread = new THREE.Mesh(
+      new THREE.BoxGeometry(STAIR_WIDTH, 0.1, STAIR_RUN),
+      stairTreadMat
+    );
+    tread.position.set(STATION_X, (i + 1) * STAIR_RISE, stepZ);
+    tread.receiveShadow = true;
+    scene.add(tread);
+    // Physics box for each step (so the car bumps off them and walking man stands on each)
+    const stepPhys = new CANNON.Body({ mass: 0, material: groundMat });
+    stepPhys.addShape(new CANNON.Box(new CANNON.Vec3(STAIR_WIDTH / 2, STAIR_RISE / 2, STAIR_RUN / 2)));
+    stepPhys.position.set(STATION_X, stepY, stepZ);
+    world.addBody(stepPhys);
+  }
+  // Side railings — cyan glow, run the full length of the stairs at the top of each side
+  for (const dx of [-2.6, 2.6]) {
+    const railLen = Math.hypot(STATION_H, STAIR_COUNT * STAIR_RUN);
+    const railAng = Math.atan2(STATION_H, STAIR_COUNT * STAIR_RUN);
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.5, railLen),
+      new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.5 })
+    );
+    rail.position.set(STATION_X + dx, STATION_H / 2 + 0.7, (stairTopZ + stairBottomZ) / 2);
+    rail.rotation.x = -railAng;
+    scene.add(rail);
+  }
+  // Sign at the foot of the stairs
+  const rampSign = makeLabel('↑ WALK UP TO CABLE CAR', '#ffe066', 90);
+  rampSign.position.set(STATION_X, 4, stairBottomZ - 2);
+  rampSign.scale.set(0.5, 0.5, 0.5);
+  rampSign.userData.noBillboard = true;
+  scene.add(rampSign);
+  // Turn-off signpost on Pasha Boulevard (z=0, x=42 — at NS-42E intersection with EW-0)
+  // Tells the player driving east on the boulevard to turn left for the cable car
+  const turnSignPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+  );
+  turnSignPost.position.set(42, 2, 4.5);
+  turnSignPost.castShadow = true;
+  scene.add(turnSignPost);
+  const turnSign = makeLabel('← CABLE CAR · ALPINE VILLAGE', '#ffe066', 70);
+  turnSign.position.set(42, 4.2, 4.5);
+  turnSign.scale.set(0.45, 0.45, 0.45);
+  turnSign.userData.noBillboard = true;
+  scene.add(turnSign);
+  const turnSignBack = makeLabel('CABLE CAR · ALPINE VILLAGE →', '#ffe066', 70);
+  turnSignBack.position.set(42, 4.2, 4.5);
+  turnSignBack.rotation.y = Math.PI;
+  turnSignBack.scale.set(0.45, 0.45, 0.45);
+  turnSignBack.userData.noBillboard = true;
+  scene.add(turnSignBack);
+  // Wire — single thin cylinder stretched between the points
+  const cableLen = cableStart.distanceTo(cableEnd);
+  const cableMid = cableStart.clone().lerp(cableEnd, 0.5);
+  const cableDir = cableEnd.clone().sub(cableStart).normalize();
+  const cableWire = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.04, cableLen, 6),
+    new THREE.MeshBasicMaterial({ color: 0x111 })
+  );
+  cableWire.position.copy(cableMid);
+  // Orient cylinder along the cable direction (default cylinder axis = Y, rotate to match)
+  const cableAxis = new THREE.Vector3(0, 1, 0);
+  cableWire.quaternion.setFromUnitVectors(cableAxis, cableDir);
+  scene.add(cableWire);
+  // Gondola box hanging from the wire
+  const gondolaGroup = new THREE.Group();
+  const gondolaBody = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.9, 1.4),
+    new THREE.MeshStandardMaterial({ color: 0xff6a3a, emissive: 0xff6a3a, emissiveIntensity: 0.2, roughness: 0.5 })
+  );
+  gondolaBody.position.y = -0.7;
+  gondolaBody.castShadow = true;
+  gondolaGroup.add(gondolaBody);
+  // Gondola windows (cyan)
+  for (const sx of [-0.4, 0.4]) {
+    const win = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.4, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.5 })
+    );
+    win.position.set(sx, -0.6, 0.71);
+    gondolaGroup.add(win);
+    const win2 = win.clone();
+    win2.position.z = -0.71;
+    win2.rotation.y = Math.PI;
+    gondolaGroup.add(win2);
+  }
+  // Hanger arm
+  const gondolaArm = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.35, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x222 })
+  );
+  gondolaArm.position.y = -0.05;
+  gondolaGroup.add(gondolaArm);
+  scene.add(gondolaGroup);
+  // Animation state — t goes 0→1→0 on a 60-sec cycle
+  let cableT = 0, cableDirSign = 1;
+
+  // ─── Wooden Swiss chalets (4 variant 'D' buildings near mountain edge) ───
+  function addChalet(x, z, rotY = 0) {
+    const g = new THREE.Group();
+    // Wooden walls
+    const walls = new THREE.Mesh(
+      new THREE.BoxGeometry(5, 4, 4),
+      new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.85, metalness: 0 })
+    );
+    walls.position.y = 2;
+    walls.castShadow = true; walls.receiveShadow = true;
+    g.add(walls);
+    // Steep red triangular roof — two angled boxes forming an A-frame
+    const roofL = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 0.2, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+    );
+    roofL.position.set(0, 5.0, -0.95);
+    roofL.rotation.x = -Math.PI / 4;
+    roofL.castShadow = true;
+    g.add(roofL);
+    const roofR = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 0.2, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+    );
+    roofR.position.set(0, 5.0, 0.95);
+    roofR.rotation.x = Math.PI / 4;
+    roofR.castShadow = true;
+    g.add(roofR);
+    // Window with cross-frame (two yellow squares)
+    for (const [wx, wz, fr] of [[-1.0, 2.02, 0], [1.0, 2.02, 0], [0, 2.02, 0], [0, -2.02, Math.PI]]) {
+      const win = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.7),
+        new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffe066, emissiveIntensity: 0.6 })
+      );
+      win.position.set(wx, 2.4, wz);
+      if (fr) win.rotation.y = fr;
+      g.add(win);
+      // Cross frame
+      const v = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.06, 0.7),
+        new THREE.MeshBasicMaterial({ color: 0x4a3018 })
+      );
+      v.position.set(wx, 2.4, wz + (fr ? -0.005 : 0.005));
+      if (fr) v.rotation.y = fr;
+      g.add(v);
+      const h = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.7, 0.06),
+        new THREE.MeshBasicMaterial({ color: 0x4a3018 })
+      );
+      h.position.set(wx, 2.4, wz + (fr ? -0.005 : 0.005));
+      if (fr) h.rotation.y = fr;
+      g.add(h);
+    }
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    scene.add(g);
+  }
+  // Alpine Village cluster — 4 chalets ring the cable car station at (40, 30)
+  addChalet(90, 35, Math.PI/6);     // east of station, near observation tower
+  addChalet(62, 38, -Math.PI/8);    // south chalet of village, just east of station
+  addChalet(78, 50, -Math.PI/4);    // between station and tower
+  addChalet(50, 75, Math.PI/3);     // north chalet, near tower
+
+  // ─── Wildflower clusters scattered in meadows (yellow/orange — no pink) ───
+  const flowerGeo = new THREE.BufferGeometry();
+  const FLOWER_COUNT = 600;
+  const flowerPos = new Float32Array(FLOWER_COUNT * 3);
+  const flowerColors = new Float32Array(FLOWER_COUNT * 3);
+  for (let i = 0; i < FLOWER_COUNT; i++) {
+    // Cluster the flowers in random patches
+    const cx = (Math.random() - 0.5) * 180;
+    const cz = (Math.random() - 0.5) * 180;
+    flowerPos[i*3+0] = cx + (Math.random() - 0.5) * 8;
+    flowerPos[i*3+1] = 0.4;
+    flowerPos[i*3+2] = cz + (Math.random() - 0.5) * 8;
+    // Yellow / orange / white wildflower colors
+    const palette = [[1.0, 0.88, 0.4], [1.0, 0.55, 0.2], [1.0, 0.95, 0.85], [0.96, 0.7, 0.2]];
+    const c = palette[Math.floor(Math.random() * palette.length)];
+    flowerColors[i*3+0] = c[0]; flowerColors[i*3+1] = c[1]; flowerColors[i*3+2] = c[2];
+  }
+  flowerGeo.setAttribute('position', new THREE.BufferAttribute(flowerPos, 3));
+  flowerGeo.setAttribute('color', new THREE.BufferAttribute(flowerColors, 3));
+  const flowerMat = new THREE.PointsMaterial({
+    size: 0.45, sizeAttenuation: true, vertexColors: true,
+    transparent: true, opacity: 0.95, depthWrite: false,
+  });
+  const wildflowers = new THREE.Points(flowerGeo, flowerMat);
+  scene.add(wildflowers);
+
+  // ─── Rally checkpoint markers (5 hidden in the grass — collect all for achievement) ───
+  const rallyCheckpoints = [];
+  function addRallyCheckpoint(x, z) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(2.0, 0.15, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffe066, emissiveIntensity: 1.4 })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 1.5, z);
+    scene.add(ring);
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.0, 2.0, 12, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+    );
+    beam.position.set(x, 6, z);
+    scene.add(beam);
+    rallyCheckpoints.push({ x, z, ring, beam, collected: false });
+  }
+  // Spread them across off-road grass areas (NOT on roads)
+  addRallyCheckpoint(-65, 25);
+  addRallyCheckpoint(75, 40);
+  addRallyCheckpoint(-50, -78);
+  addRallyCheckpoint(50, -80);
+  addRallyCheckpoint(0, 90);
+  let rallyCount = 0;
+
+  // ─── Off-road detection helper (NFS Most Wanted vibe) ───
+  // Roads are at x ∈ {-42,-32,-22,-12,0,12,22,32,42} and z ∈ {-50,-32,-22,-17.5,-12,-10,0,12,22,32,38,50,60,65}
+  // Width 5 — anywhere within 3 units of any road centerline counts as on-road.
+  const ROAD_X = [-77, -42, -32, -22, -12, 0, 12, 22, 32, 42];
+  const ROAD_Z = [-50, -32, -22, -17.5, -12, -10, 0, 12, 22, 32, 38, 50, 60, 65];
+  function isOnRoad(x, z) {
+    for (const rx of ROAD_X) if (Math.abs(x - rx) < 3) return true;
+    for (const rz of ROAD_Z) if (Math.abs(z - rz) < 3) return true;
+    return false;
+  }
+  window.__imranIsOnRoad = isOnRoad;
+
+  // Cowbell sound (procedural, single sine + bell envelope) — fire when near mountains
+  let lastCowbell = 0;
+  function maybeCowbell(now) {
+    const carDistFromCenter = Math.hypot(carGroup.position.x, carGroup.position.z);
+    if (carDistFromCenter < 80) return;     // too far from mountains
+    if (now - lastCowbell < 30000 + Math.random() * 30000) return;
+    lastCowbell = now;
+    if (window.imranSound && window.imranSound._ctx_for_cowbell !== false) {
+      try {
+        const ctx = window.imranSound.unlock && (window.imranSound._ctx || (window.imranSound.unlock(), window.imranSound._ctx));
+      } catch (e) {}
+    }
+    // Use a tiny one-shot via Web Audio if available
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const c = window.__imranCowbellCtx || (window.__imranCowbellCtx = new AC());
+      const t = c.currentTime;
+      const o = c.createOscillator();
+      o.type = 'sine'; o.frequency.value = 440 + Math.random() * 60;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0, t);
+      g.gain.linearRampToValueAtTime(0.06, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      o.connect(g).connect(c.destination);
+      o.start(t); o.stop(t + 1.5);
+    } catch (e) {}
+  }
+  window.__imranCowbellTick = maybeCowbell;
+
+  // Expose Switzerland animation hooks for tick loop
+  window.__imranSwiss = {
+    cableStart, cableEnd, gondola: gondolaGroup,
+    rallyCheckpoints, rallyCount: () => rallyCount, incrementRally: () => rallyCount++,
+  };
+
+  // ─────────────── ✈️ AIRPORT (SW district, outside old boundary) ───────────────
+  // Runway running E-W centred at (-110, 0, -110). Terminal building at the south end,
+  // two planes loop a takeoff/land animation along the runway.
+  const APT_X = -110, APT_Z = -110;
+  // Runway tarmac — long thin asphalt strip
+  const runway = new THREE.Mesh(
+    new THREE.PlaneGeometry(80, 12),
+    new THREE.MeshStandardMaterial({ color: 0x222024, roughness: 0.95, metalness: 0.05 })
+  );
+  runway.rotation.x = -Math.PI/2;
+  runway.position.set(APT_X, 0.05, APT_Z);
+  runway.receiveShadow = true;
+  scene.add(runway);
+  // Centre lane stripes
+  for (let i = -36; i <= 36; i += 8) {
+    const dash = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 0.4),
+      new THREE.MeshBasicMaterial({ color: 0xffe066 })
+    );
+    dash.rotation.x = -Math.PI/2;
+    dash.position.set(APT_X + i, 0.08, APT_Z);
+    scene.add(dash);
+  }
+  // Threshold chevrons at each end
+  for (const endX of [APT_X - 38, APT_X + 38]) {
+    for (let dz = -4.5; dz <= 4.5; dz += 1.5) {
+      const chev = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2, 0.35),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      chev.rotation.x = -Math.PI/2;
+      chev.position.set(endX, 0.07, APT_Z + dz);
+      scene.add(chev);
+    }
+  }
+  // Terminal building — long modernist box
+  const terminalBody = new THREE.Mesh(
+    new THREE.BoxGeometry(34, 7, 11),
+    new THREE.MeshStandardMaterial({ color: 0xd6c8b0, roughness: 0.7, metalness: 0.1 })
+  );
+  terminalBody.position.set(APT_X, 3.5, APT_Z - 18);
+  terminalBody.castShadow = true; terminalBody.receiveShadow = true;
+  scene.add(terminalBody);
+  const terminalRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(36, 0.4, 13),
+    new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.4 })
+  );
+  terminalRoof.position.set(APT_X, 7.2, APT_Z - 18);
+  scene.add(terminalRoof);
+  // Glass strip windows on the runway-facing side
+  const terminalGlass = new THREE.Mesh(
+    new THREE.PlaneGeometry(32, 4),
+    new THREE.MeshStandardMaterial({ color: 0x1a3850, emissive: 0x5ce5ff, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.6 })
+  );
+  terminalGlass.position.set(APT_X, 4, APT_Z - 12.45);
+  scene.add(terminalGlass);
+  // Control tower (airport — renamed to avoid collision with observation tower)
+  const aptTowerShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 1.6, 14, 12),
+    new THREE.MeshStandardMaterial({ color: 0xc8b89a, roughness: 0.7 })
+  );
+  aptTowerShaft.position.set(APT_X + 14, 7, APT_Z - 22);
+  aptTowerShaft.castShadow = true;
+  scene.add(aptTowerShaft);
+  const aptTowerCab = new THREE.Mesh(
+    new THREE.BoxGeometry(4.5, 2.5, 4.5),
+    new THREE.MeshStandardMaterial({ color: 0x1a3850, emissive: 0xffe066, emissiveIntensity: 0.5, metalness: 0.4 })
+  );
+  aptTowerCab.position.set(APT_X + 14, 15, APT_Z - 22);
+  aptTowerCab.castShadow = true;
+  scene.add(aptTowerCab);
+  const aptTowerRoof = new THREE.Mesh(
+    new THREE.ConeGeometry(2.8, 1.4, 8),
+    new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+  );
+  aptTowerRoof.position.set(APT_X + 14, 17, APT_Z - 22);
+  scene.add(aptTowerRoof);
+  // "AIRPORT" sign on the terminal facade
+  const aptSign = makeLabel('✈ IMRAN INTERNATIONAL', '#ffe066', 80);
+  aptSign.position.set(APT_X, 8.4, APT_Z - 12.55);
+  aptSign.scale.set(0.7, 0.7, 0.7);
+  aptSign.userData.noBillboard = true;
+  scene.add(aptSign);
+
+  // Two animated planes that loop takeoff/landing along the runway (-X to +X)
+  function makePlane(color = 0xffffff) {
+    const g = new THREE.Group();
+    // Fuselage
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.55, 0.45, 6.5, 10),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 })
+    );
+    body.rotation.z = Math.PI/2;
+    body.castShadow = true;
+    g.add(body);
+    // Nose cone
+    const nose = new THREE.Mesh(
+      new THREE.ConeGeometry(0.45, 1.2, 10),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 })
+    );
+    nose.rotation.z = -Math.PI/2;
+    nose.position.set(3.85, 0, 0);
+    g.add(nose);
+    // Main wings
+    const wing = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.12, 6.5),
+      new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.2, roughness: 0.4 })
+    );
+    wing.position.set(-0.2, 0, 0);
+    wing.castShadow = true;
+    g.add(wing);
+    // Tail fin
+    const tailV = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 1.2, 0.1),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5 })
+    );
+    tailV.position.set(-2.8, 0.6, 0);
+    g.add(tailV);
+    // Tail horizontal
+    const tailH = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.08, 1.8),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5 })
+    );
+    tailH.position.set(-2.8, 0.5, 0);
+    g.add(tailH);
+    return g;
+  }
+  const planeA = makePlane(0xeef0f5);
+  const planeB = makePlane(0xffb070);
+  scene.add(planeA);
+  scene.add(planeB);
+  // Animation state — each plane runs an independent 30-sec loop with phase offset
+  const planeStateA = { t: 0, period: 30, x0: APT_X };
+  const planeStateB = { t: 15, period: 30, x0: APT_X };
+  function tickAirport(dt) {
+    for (const p of [planeStateA, planeStateB]) {
+      p.t = (p.t + dt) % p.period;
+      const u = p.t / p.period;            // 0..1 over 30 sec
+      const isA = (p === planeStateA);
+      const plane = isA ? planeA : planeB;
+      // 0.0-0.30: roll along runway (y=1, x: -38 → +38)
+      // 0.30-0.45: liftoff (climb to y=18, x continues +18)
+      // 0.45-0.55: cruise far away (off-screen wraparound)
+      // 0.55-0.70: descend back (y from 18 → 1, x: +38 → -38, reversed direction)
+      // 0.70-1.00: taxi back to start
+      let x, y, yaw, pitch;
+      if (u < 0.30) {
+        // takeoff roll
+        const r = u / 0.30;
+        x = -38 + r * 76;
+        y = 1.0;
+        yaw = 0;     // facing +X
+        pitch = 0;
+      } else if (u < 0.45) {
+        // climb out
+        const r = (u - 0.30) / 0.15;
+        x = 38 + r * 60;
+        y = 1.0 + r * 25;
+        yaw = 0;
+        pitch = -0.35 * Math.sin(r * Math.PI);   // pitch up then level
+      } else if (u < 0.55) {
+        // off-screen / wraparound — fade up high then approach from other side
+        x = 100 - (u - 0.45) / 0.10 * 200;
+        y = 28;
+        yaw = Math.PI;     // turning around
+        pitch = 0;
+      } else if (u < 0.70) {
+        // approach + descend
+        const r = (u - 0.55) / 0.15;
+        x = -100 + r * 60;
+        y = 28 - r * 27;
+        yaw = Math.PI;     // facing -X
+        pitch = 0.2 * Math.sin(r * Math.PI);    // pitch up for flare
+      } else {
+        // taxi back to start
+        const r = (u - 0.70) / 0.30;
+        x = -40 + r * 2;     // stay near west threshold
+        y = 1.0;
+        yaw = 0;
+        pitch = 0;
+      }
+      plane.position.set(APT_X + x, y, APT_Z);
+      plane.rotation.set(0, yaw, pitch);
+    }
+  }
+  window.__imranAirport = { tick: tickAirport };
+
+  // ─────────────── ⚓ HARBOUR (SE district, outside old boundary) ───────────────
+  // Sandy beach + ocean rectangle + 2 ships sailing in a slow loop
+  const HBR_X = 110, HBR_Z = 110;
+  // Beach — large sand-coloured circle
+  const beach = new THREE.Mesh(
+    new THREE.CircleGeometry(28, 36),
+    new THREE.MeshStandardMaterial({ color: 0xe8c290, roughness: 1.0, metalness: 0 })
+  );
+  beach.rotation.x = -Math.PI/2;
+  beach.position.set(HBR_X - 18, 0.04, HBR_Z - 8);
+  beach.receiveShadow = true;
+  scene.add(beach);
+  // Ocean — large blue rectangle east + south of the beach
+  const ocean = new THREE.Mesh(
+    new THREE.PlaneGeometry(75, 75),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a6a9c, roughness: 0.3, metalness: 0.4,
+      emissive: 0x103450, emissiveIntensity: 0.15,
+    })
+  );
+  ocean.rotation.x = -Math.PI/2;
+  ocean.position.set(HBR_X + 18, 0.06, HBR_Z + 12);
+  ocean.receiveShadow = true;
+  scene.add(ocean);
+  // Pier extending into the ocean from the beach (renamed to avoid lake-pier collision)
+  const hbrPier = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.3, 3),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.85 })
+  );
+  hbrPier.position.set(HBR_X + 4, 0.35, HBR_Z - 4);
+  hbrPier.castShadow = true; hbrPier.receiveShadow = true;
+  scene.add(hbrPier);
+  // Pier supports
+  for (let i = -7; i <= 7; i += 3.5) {
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.16, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+    );
+    post.position.set(HBR_X + 4 + i, 0.5, HBR_Z - 5.4);
+    scene.add(post);
+    const post2 = post.clone();
+    post2.position.set(HBR_X + 4 + i, 0.5, HBR_Z - 2.6);
+    scene.add(post2);
+  }
+  // Lighthouse at the harbour mouth
+  const lhBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 1.8, 2, 12),
+    new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 0.9 })
+  );
+  lhBase.position.set(HBR_X + 35, 1, HBR_Z - 18);
+  lhBase.castShadow = true;
+  scene.add(lhBase);
+  const lhShaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.9, 1.1, 9, 12),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 })
+  );
+  lhShaft.position.set(HBR_X + 35, 6.5, HBR_Z - 18);
+  lhShaft.castShadow = true;
+  scene.add(lhShaft);
+  // Red horizontal stripes
+  for (const stripeY of [4, 7, 10]) {
+    const stripe = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.0, 0.8, 12),
+      new THREE.MeshStandardMaterial({ color: 0xa83232 })
+    );
+    stripe.position.set(HBR_X + 35, stripeY, HBR_Z - 18);
+    scene.add(stripe);
+  }
+  // Lighthouse lamp
+  const lhLamp = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffe066, emissiveIntensity: 1.5 })
+  );
+  lhLamp.position.set(HBR_X + 35, 12, HBR_Z - 18);
+  scene.add(lhLamp);
+  const lhLight = new THREE.PointLight(0xffe066, 1.6, 60, 1.5);
+  lhLight.position.set(HBR_X + 35, 12, HBR_Z - 18);
+  scene.add(lhLight);
+  // "HARBOUR" sign
+  const hbrSign = makeLabel('⚓ IMRAN HARBOUR', '#5ce5ff', 80);
+  hbrSign.position.set(HBR_X - 18, 6, HBR_Z - 18);
+  hbrSign.scale.set(0.8, 0.8, 0.8);
+  hbrSign.userData.noBillboard = true;
+  scene.add(hbrSign);
+
+  // 2 ships sailing in a circular loop on the ocean
+  function makeShip(color = 0xeef0f5) {
+    const g = new THREE.Group();
+    // Hull — wider at top, narrower at bottom
+    const hull = new THREE.Mesh(
+      new THREE.BoxGeometry(8, 1.4, 3),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 })
+    );
+    hull.position.y = 0.7;
+    hull.castShadow = true;
+    g.add(hull);
+    // Bow point
+    const bow = new THREE.Mesh(
+      new THREE.ConeGeometry(1.5, 2, 4),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.6 })
+    );
+    bow.rotation.z = -Math.PI/2;
+    bow.rotation.x = Math.PI/4;     // align cone to point along +X
+    bow.position.set(4.5, 0.7, 0);
+    g.add(bow);
+    // Cabin / superstructure
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 1.6, 2.4),
+      new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.7 })
+    );
+    cabin.position.set(-1, 2.2, 0);
+    cabin.castShadow = true;
+    g.add(cabin);
+    // Funnel / smokestack
+    const stack = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.5, 1.6, 10),
+      new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+    );
+    stack.position.set(-1.6, 3.6, 0);
+    g.add(stack);
+    // Mast
+    const mast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.06, 4, 6),
+      new THREE.MeshStandardMaterial({ color: 0x222 })
+    );
+    mast.position.set(2, 3.5, 0);
+    g.add(mast);
+    return g;
+  }
+  const shipA = makeShip(0xeef0f5);
+  const shipB = makeShip(0xffb070);
+  scene.add(shipA);
+  scene.add(shipB);
+  // Each ship orbits around an offshore centre, with phase offset
+  const shipStateA = { t: 0, period: 80, cx: HBR_X + 25, cz: HBR_Z + 18, r: 18 };
+  const shipStateB = { t: 40, period: 80, cx: HBR_X + 25, cz: HBR_Z + 18, r: 24 };
+  function tickHarbour(dt) {
+    for (const s of [shipStateA, shipStateB]) {
+      s.t = (s.t + dt) % s.period;
+      const ang = (s.t / s.period) * Math.PI * 2;
+      const x = s.cx + Math.cos(ang) * s.r;
+      const z = s.cz + Math.sin(ang) * s.r;
+      const ship = (s === shipStateA) ? shipA : shipB;
+      ship.position.set(x, 0.05, z);
+      // Face along the orbit direction (tangent)
+      ship.rotation.y = -ang + Math.PI/2;
+      // Bob slightly with the waves
+      ship.position.y = 0.05 + Math.sin(s.t * 1.2) * 0.05;
+    }
+  }
+  window.__imranHarbour = { tick: tickHarbour };
+
+  // Harbour fisherman + phishing-demo zone — sits at the end of the pier.
+  // Clicking him (driving/walking near + E) opens a phishing-credential demo modal.
+  const fisherGroup = new THREE.Group();
+  // Fisherman body (simple seated figure — capsule body + sphere head + fishing rod)
+  const fishBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32, 0.32, 1.0, 12),
+    new THREE.MeshStandardMaterial({ color: 0x6a4a3a, roughness: 0.8 })
+  );
+  fishBody.position.y = 0.7;
+  fishBody.castShadow = true;
+  fisherGroup.add(fishBody);
+  const fishHead = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 14, 12),
+    new THREE.MeshStandardMaterial({ color: 0xd0a070, roughness: 0.85 })
+  );
+  fishHead.position.y = 1.5;
+  fisherGroup.add(fishHead);
+  // Conical sun hat
+  const fishHat = new THREE.Mesh(
+    new THREE.ConeGeometry(0.5, 0.4, 12),
+    new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.9 })
+  );
+  fishHat.position.y = 1.85;
+  fisherGroup.add(fishHat);
+  // Fishing rod — angled cylinder pointing outward toward the water
+  const fishRod = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 3.5, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2a1a10 })
+  );
+  fishRod.position.set(0.45, 1.6, 0);
+  fishRod.rotation.z = -Math.PI / 4;
+  fishRod.rotation.y = Math.PI / 2;
+  fisherGroup.add(fishRod);
+  fisherGroup.position.set(HBR_X + 12, 0.5, HBR_Z - 4);
+  scene.add(fisherGroup);
+  // Floating fishing line + animated lure (animated in tick via window.__imranFisher)
+  const fishLine = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 2.5, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  fishLine.position.set(HBR_X + 14, 1.2, HBR_Z - 4);
+  scene.add(fishLine);
+  // Phishing-demo signpost (visible from both sides)
+  const phishPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  phishPost.position.set(HBR_X + 8, 1.75, HBR_Z - 7);
+  scene.add(phishPost);
+  const phishSign = makeLabel('🎣 PHISHING DEMO — press E', '#ff8a6e', 70);
+  phishSign.position.set(HBR_X + 8, 3.5, HBR_Z - 7);
+  phishSign.scale.set(0.6, 0.6, 0.6);
+  phishSign.userData.noBillboard = true;
+  scene.add(phishSign);
+  // Register the phishing zone — fires whenever the player approaches the harbour/beach area.
+  // Center at harbour core (110, 110), radius 50 covers the whole beach approach so the prompt
+  // appears as soon as the player gets near the sand, not just at the water's edge.
+  zones.push({
+    x: HBR_X, z: HBR_Z, radius: 50, key: 'phishing_demo',
+    label: 'PHISHING DEMO', ring: null, lab: phishSign
+  });
+  // Animate the fishing line subtly bobbing
+  function tickFisher(t) {
+    fishLine.position.y = 1.2 + Math.sin(t * 1.5) * 0.1;
+  }
+  window.__imranFisher = { tick: tickFisher };
+
+  // ─────────────── 🎈 HOT AIR BALLOON STATION ───────────────
+  // 6 balloons clustered at (50, 0, -110) — south of spawn, between mailroom and airport.
+  // 4 balloons grounded (parked), 2 are continuously animating takeoff/landing cycles.
+  // Player can press E near a grounded one to take a balloon ride.
+  const BAL_X = 50, BAL_Z = -110;
+  // Station ground pad (grass-clearing for balloons)
+  const balPad = new THREE.Mesh(
+    new THREE.CircleGeometry(20, 36),
+    new THREE.MeshStandardMaterial({ color: 0x8a7058, roughness: 1.0 })
+  );
+  balPad.rotation.x = -Math.PI/2;
+  balPad.position.set(BAL_X, 0.04, BAL_Z);
+  balPad.receiveShadow = true;
+  scene.add(balPad);
+  // Station signpost
+  const balPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.15, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018 })
+  );
+  balPost.position.set(BAL_X - 18, 2, BAL_Z + 5);
+  scene.add(balPost);
+  const balSign = makeLabel('🎈 BALLOON STATION', '#ff8a6e', 80);
+  balSign.position.set(BAL_X - 18, 4.4, BAL_Z + 5);
+  balSign.scale.set(0.6, 0.6, 0.6);
+  balSign.userData.noBillboard = true;
+  scene.add(balSign);
+  // Helper to build one balloon
+  function makeBalloon(color, basketColor = 0x6e4a28) {
+    const g = new THREE.Group();
+    // Envelope (sphere — squished slightly vertically for teardrop shape)
+    const env = new THREE.Mesh(
+      new THREE.SphereGeometry(2.4, 18, 14),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.6 })
+    );
+    env.scale.set(1, 1.15, 1);
+    env.position.y = 5.5;
+    env.castShadow = true;
+    g.add(env);
+    // Vertical color bands for visual variety
+    for (const ang of [0, Math.PI/3, 2*Math.PI/3, Math.PI, 4*Math.PI/3, 5*Math.PI/3]) {
+      const band = new THREE.Mesh(
+        new THREE.TorusGeometry(2.4, 0.08, 6, 24, Math.PI),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })
+      );
+      band.rotation.y = ang;
+      band.rotation.x = Math.PI / 2;
+      band.position.y = 5.5;
+      band.scale.set(1, 1, 1.15);
+      g.add(band);
+    }
+    // Basket
+    const basket = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 1.0, 1.4),
+      new THREE.MeshStandardMaterial({ color: basketColor, roughness: 0.85 })
+    );
+    basket.position.y = 1.5;
+    basket.castShadow = true;
+    g.add(basket);
+    // 4 ropes connecting basket to envelope
+    for (const [dx, dz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) {
+      const rope = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 2.5, 4),
+        new THREE.MeshBasicMaterial({ color: 0x222 })
+      );
+      rope.position.set(dx, 3.0, dz);
+      g.add(rope);
+    }
+    return g;
+  }
+  // 4 grounded balloons in a 2×2 grid (player can ride these)
+  const groundedBalloons = [];
+  const stationBalloonColors = [0xff6a3a, 0x5ce5ff, 0xffe066, 0xa83232, 0x6e4a8c, 0xf2c8a0];
+  let bcIdx = 0;
+  for (const [dx, dz] of [[-7, -5], [7, -5], [-7, 8], [7, 8]]) {
+    const b = makeBalloon(stationBalloonColors[bcIdx++ % stationBalloonColors.length]);
+    b.position.set(BAL_X + dx, 0, BAL_Z + dz);
+    scene.add(b);
+    groundedBalloons.push(b);
+    // Each grounded balloon has a small "RIDE — E" sign next to it
+    const ridePost = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6),
+      new THREE.MeshStandardMaterial({ color: 0x222 })
+    );
+    ridePost.position.set(BAL_X + dx + 1.5, 0.75, BAL_Z + dz);
+    scene.add(ridePost);
+    // Register a small zone pad for ride trigger
+    zones.push({
+      x: BAL_X + dx, z: BAL_Z + dz, radius: 3, key: 'balloon_ride_pad',
+      rideTarget: b, label: 'RIDE BALLOON', ring: null, lab: null
+    });
+  }
+  // 2 animating balloons that take off + land on a 40-sec cycle
+  const animBalloons = [
+    { mesh: makeBalloon(stationBalloonColors[bcIdx++ % stationBalloonColors.length]), t: 0,  period: 40, x: BAL_X - 14, z: BAL_Z + 2 },
+    { mesh: makeBalloon(stationBalloonColors[bcIdx++ % stationBalloonColors.length]), t: 20, period: 40, x: BAL_X + 14, z: BAL_Z + 2 },
+  ];
+  for (const ab of animBalloons) {
+    ab.mesh.position.set(ab.x, 0, ab.z);
+    scene.add(ab.mesh);
+  }
+  // Tour path for the rideable balloon — Catmull-Rom spline through the city.
+  // Y values define the altitude profile (rises, cruises, descends).
+  const balloonTourCam = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(BAL_X,   0, BAL_Z),         // takeoff
+    new THREE.Vector3(BAL_X,  35, BAL_Z + 20),    // climb out
+    new THREE.Vector3(  20,  60, -50),            // cruise NE over the city
+    new THREE.Vector3(  60,  70,  20),            // pass the cable car / alpine
+    new THREE.Vector3(  85,  65,  65),            // over observation tower
+    new THREE.Vector3( 100,  60, 100),            // over harbour
+    new THREE.Vector3(  40,  55,  90),            // swing back west
+    new THREE.Vector3( -40,  60,  40),            // pass HTB skull / hacker den
+    new THREE.Vector3( -90,  55, -40),            // over airport
+    new THREE.Vector3(   0,  45, -80),            // approach back from south
+    new THREE.Vector3(BAL_X,  20, BAL_Z + 5),     // final descent
+    new THREE.Vector3(BAL_X,   0, BAL_Z),         // touchdown
+  ], false, 'catmullrom', 0.5);
+
+  function tickBalloons(dt) {
+    // ─── Active rider's balloon — animate along the tour path ───
+    if (rideTarget && rideTarget.userData && rideTarget.userData.rideTour) {
+      const tour = rideTarget.userData.rideTour;
+      tour.t += dt;
+      const u = Math.min(1, tour.t / tour.duration);
+      const p = balloonTourCam.getPoint(u);
+      rideTarget.position.copy(p);
+      // Subtle sway
+      rideTarget.rotation.z = Math.sin(tour.t) * 0.04;
+      // Auto-exit when tour completes
+      if (tour.t >= tour.duration) {
+        // Snap back to home pad and exit ride
+        rideTarget.position.set(tour.homeX, tour.homeY, tour.homeZ);
+        rideTarget.userData.rideTour = null;
+        exitRideMode();
+      }
+    }
+    // ─── Continuously-animating decorative balloons ───
+    for (const ab of animBalloons) {
+      ab.t = (ab.t + dt) % ab.period;
+      const u = ab.t / ab.period;
+      let y, drift;
+      if (u < 0.10) {
+        // ground hold (boarding)
+        y = 0;
+        drift = 0;
+      } else if (u < 0.35) {
+        // ascend
+        const r = (u - 0.10) / 0.25;
+        y = r * 60;
+        drift = r * 30;
+      } else if (u < 0.65) {
+        // cruise high
+        y = 60 + Math.sin((u - 0.35) * Math.PI * 4) * 5;
+        drift = 30 + (u - 0.35) * 20;     // slow drift
+      } else if (u < 0.90) {
+        // descend
+        const r = (u - 0.65) / 0.25;
+        y = 60 - r * 60;
+        drift = 36 - r * 36;
+      } else {
+        // ground hold (deboarding)
+        y = 0;
+        drift = 0;
+      }
+      ab.mesh.position.set(ab.x + drift * 0.6, y, ab.z);
+      // Subtle sway
+      ab.mesh.rotation.z = Math.sin(ab.t) * 0.03;
+    }
+  }
+  window.__imranBalloons = { tick: tickBalloons, grounded: groundedBalloons };
+
+  // ─────────────── 🛡️ SECURITY ZONE — "The Hacker's Den" at (-80, 0, -10) ───────────────
+  const denX = -80, denZ = -10;
+  const denGroup = new THREE.Group();
+  denGroup.position.set(denX, 0, denZ);
+  scene.add(denGroup);
+
+  // Den marker pad — dark with green emissive (matrix vibe)
+  const denPad = new THREE.Mesh(
+    new THREE.CylinderGeometry(8, 8, 0.18, 48),
+    new THREE.MeshStandardMaterial({ color: 0x0a1a0a, emissive: 0x004400, emissiveIntensity: 0.3 })
+  );
+  denPad.position.y = 0.05;
+  denGroup.add(denPad);
+  const denPadRing = new THREE.Mesh(
+    new THREE.RingGeometry(7.8, 8.1, 64),
+    new THREE.MeshBasicMaterial({ color: 0x9fef00, transparent: true, opacity: 0.7 })
+  );
+  denPadRing.rotation.x = -Math.PI/2;
+  denPadRing.position.y = 0.07;
+  denGroup.add(denPadRing);
+  // Big "HACKER'S DEN" label hovering above
+  const denTitleLab = makeLabel("HACKER'S DEN", '#9fef00', 130);
+  denTitleLab.position.set(0, 7, 0);
+  denTitleLab.scale.set(1.2, 1.2, 1.2);
+  denGroup.add(denTitleLab);
+
+  // ─── S2: Famous Breach Timeline — 7 markers along a curved path north of pad ───
+  const breaches = [
+    { yr: 2014, name: 'Heartbleed',   desc: 'OpenSSL TLS heartbeat memory leak' },
+    { yr: 2016, name: 'Mirai Botnet', desc: 'IoT devices DDoS attack (Dyn)' },
+    { yr: 2017, name: 'WannaCry',     desc: 'Worm ransomware via SMBv1 EternalBlue' },
+    { yr: 2017, name: 'Equifax',      desc: '147M records via Apache Struts CVE' },
+    { yr: 2020, name: 'SolarWinds',   desc: 'Supply-chain backdoor in Orion' },
+    { yr: 2021, name: 'Log4Shell',    desc: 'Log4j JNDI RCE — CVSS 10.0' },
+    { yr: 2023, name: 'MOVEit',       desc: 'Cl0p ransomware via SQL injection' },
+  ];
+  for (let i = 0; i < breaches.length; i++) {
+    const b = breaches[i];
+    const bx = -10 + i * 4;
+    const bz = 12;
+    // Pole
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 3, 6),
+      new THREE.MeshStandardMaterial({ color: 0x222 })
+    );
+    pole.position.set(bx, 1.5, bz);
+    denGroup.add(pole);
+    // Glowing marker plate (CRT-style)
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(2.6, 1.4, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x0a1408, emissive: 0x9fef00, emissiveIntensity: 0.45, roughness: 0.4 })
+    );
+    plate.position.set(bx, 3.4, bz);
+    plate.castShadow = true;
+    denGroup.add(plate);
+    // Year + name labels on plate
+    const yrLab = makeLabel(String(b.yr), '#9fef00', 80);
+    yrLab.position.set(bx, 3.7, bz + 0.07);
+    yrLab.scale.set(0.45, 0.45, 0.45);
+    denGroup.add(yrLab);
+    const nmLab = makeLabel(b.name, '#ffffff', 90);
+    nmLab.position.set(bx, 3.2, bz + 0.07);
+    nmLab.scale.set(0.35, 0.35, 0.35);
+    denGroup.add(nmLab);
+  }
+  // Timeline floor stripe
+  const timelineStripe = new THREE.Mesh(
+    new THREE.BoxGeometry(28, 0.05, 0.6),
+    new THREE.MeshBasicMaterial({ color: 0x9fef00, transparent: true, opacity: 0.6 })
+  );
+  timelineStripe.position.set(2, 0.06, 12);
+  denGroup.add(timelineStripe);
+
+  // ─── S5: Padlock Garden — OWASP Top 10 as 3D padlocks (2x5 grid) south of pad ───
+  const owaspTop10 = [
+    { code: 'A01', name: 'Broken Access', open: true  },
+    { code: 'A02', name: 'Crypto Failure', open: false },
+    { code: 'A03', name: 'Injection (SQLi)', open: true  },
+    { code: 'A04', name: 'Insecure Design', open: false },
+    { code: 'A05', name: 'Misconfiguration', open: true },
+    { code: 'A06', name: 'Vuln. Components', open: true  },
+    { code: 'A07', name: 'Auth Failure', open: false },
+    { code: 'A08', name: 'Data Integrity', open: false },
+    { code: 'A09', name: 'Logging Failure', open: false },
+    { code: 'A10', name: 'SSRF', open: true  },
+  ];
+  for (let i = 0; i < owaspTop10.length; i++) {
+    const lock = owaspTop10[i];
+    const col = Math.floor(i / 5);
+    const row = i % 5;
+    const lx = -8 + col * 4;
+    const lz = -10 - row * 3;
+    // Padlock body
+    const lockBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 1.4, 0.6),
+      new THREE.MeshStandardMaterial({
+        color: lock.open ? 0xff8a6e : 0x7bc04a,
+        emissive: lock.open ? 0xff6a3a : 0x5aa030,
+        emissiveIntensity: 0.4,
+        roughness: 0.4, metalness: 0.6,
+      })
+    );
+    lockBody.position.set(lx, 1.1, lz);
+    lockBody.castShadow = true;
+    denGroup.add(lockBody);
+    // Shackle (torus, half rotated up — open or closed)
+    const shackle = new THREE.Mesh(
+      new THREE.TorusGeometry(0.45, 0.10, 8, 16, Math.PI),
+      new THREE.MeshStandardMaterial({
+        color: 0xc0c0c0, metalness: 0.8, roughness: 0.3,
+      })
+    );
+    shackle.position.set(lx, 2.1, lz);
+    shackle.rotation.x = Math.PI;
+    if (lock.open) shackle.rotation.z = -0.6;       // tilt to look "popped open"
+    denGroup.add(shackle);
+    // Label below
+    const lockLab = makeLabel(`${lock.code}: ${lock.name}`, lock.open ? '#ff8a6e' : '#7bc04a', 70);
+    lockLab.position.set(lx, 0.4, lz + 0.5);
+    lockLab.scale.set(0.32, 0.32, 0.32);
+    denGroup.add(lockLab);
+  }
+
+  // ─── S7: Linux Command Library — 12 vertical glowing book columns ───
+  const linuxCmds = [
+    { cmd: 'nmap',       use: 'network scanner' },
+    { cmd: 'tcpdump',    use: 'packet capture' },
+    { cmd: 'wireshark',  use: 'protocol analyzer' },
+    { cmd: 'gdb',        use: 'binary debugger' },
+    { cmd: 'objdump',    use: 'disassembler' },
+    { cmd: 'strace',     use: 'syscall tracer' },
+    { cmd: 'metasploit', use: 'exploit framework' },
+    { cmd: 'john',       use: 'password cracker' },
+    { cmd: 'hashcat',    use: 'GPU hash cracker' },
+    { cmd: 'hydra',      use: 'login brute-forcer' },
+    { cmd: 'burp',       use: 'web proxy/scanner' },
+    { cmd: 'ffuf',       use: 'fuzzer' },
+  ];
+  for (let i = 0; i < linuxCmds.length; i++) {
+    const c = linuxCmds[i];
+    const cx = 12 + (i % 6) * 1.6;
+    const cz = -6 + Math.floor(i / 6) * 2.0;
+    const colH = 2 + (i % 4) * 0.7;
+    const col = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, colH, 0.7),
+      new THREE.MeshStandardMaterial({
+        color: 0x111811,
+        emissive: 0x9fef00, emissiveIntensity: 0.55,
+        roughness: 0.5,
+      })
+    );
+    col.position.set(cx, colH / 2, cz);
+    col.castShadow = true;
+    denGroup.add(col);
+    const cmdLab = makeLabel(c.cmd, '#9fef00', 70);
+    cmdLab.position.set(cx, colH + 0.4, cz);
+    cmdLab.scale.set(0.28, 0.28, 0.28);
+    denGroup.add(cmdLab);
+  }
+
+  // ─── S8: SQL Injection Demo Laptop — 3D laptop prop with clickable form (handled HTML side) ───
+  const laptop = new THREE.Group();
+  // Base
+  const lapBase = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.18, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5, metalness: 0.4 })
+  );
+  lapBase.position.y = 1.2;
+  laptop.add(lapBase);
+  // Screen
+  const lapScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 1.6, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.4 })
+  );
+  lapScreen.position.set(0, 2.0, -0.7);
+  lapScreen.rotation.x = -0.2;
+  laptop.add(lapScreen);
+  // Screen glow (CanvasTexture for fake login form)
+  const sqliCanvas = document.createElement('canvas');
+  sqliCanvas.width = 256; sqliCanvas.height = 160;
+  const sqliCtx = sqliCanvas.getContext('2d');
+  sqliCtx.fillStyle = '#001100'; sqliCtx.fillRect(0, 0, 256, 160);
+  sqliCtx.fillStyle = '#9fef00';
+  sqliCtx.font = '16px "JetBrains Mono", monospace';
+  sqliCtx.textAlign = 'center';
+  sqliCtx.fillText('🔓 SQLi DEMO', 128, 24);
+  sqliCtx.font = '11px "JetBrains Mono", monospace';
+  sqliCtx.fillText('Drive close & press E', 128, 48);
+  sqliCtx.fillText("then try: admin' OR '1'='1", 128, 70);
+  sqliCtx.fillStyle = '#003300';
+  sqliCtx.fillRect(20, 90, 216, 24);
+  sqliCtx.fillStyle = '#9fef00';
+  sqliCtx.fillText('| user:_______', 128, 107);
+  sqliCtx.fillRect(20, 124, 216, 24);
+  sqliCtx.fillText('| pass:_______', 128, 141);
+  const sqliTex = new THREE.CanvasTexture(sqliCanvas);
+  sqliTex.colorSpace = THREE.SRGBColorSpace;
+  const lapScreenGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.2, 1.4),
+    new THREE.MeshBasicMaterial({ map: sqliTex })
+  );
+  lapScreenGlow.position.set(0, 2.0, -0.65);
+  lapScreenGlow.rotation.x = -0.2;
+  laptop.add(lapScreenGlow);
+  laptop.position.set(0, 0, -22);
+  denGroup.add(laptop);
+  // Pad in front of laptop for E-key interaction
+  const sqliPad = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 2.2, 0.14, 32),
+    new THREE.MeshStandardMaterial({ color: 0x0a1a0a, emissive: 0x9fef00, emissiveIntensity: 0.4 })
+  );
+  sqliPad.position.set(0, 0.05, -22);
+  denGroup.add(sqliPad);
+  const sqliPadRing = new THREE.Mesh(
+    new THREE.RingGeometry(2.0, 2.3, 48),
+    new THREE.MeshBasicMaterial({ color: 0x9fef00, transparent: true, opacity: 0.7 })
+  );
+  sqliPadRing.rotation.x = -Math.PI/2;
+  sqliPadRing.position.set(0, 0.07, -22);
+  denGroup.add(sqliPadRing);
+  // Add to zones for press-E interaction
+  zones.push({ x: denX + 0, z: denZ + -22, radius: 2.2, key: 'sqli_demo', ring: sqliPadRing });
+  // Add a regular zone-pad for the den entrance
+  zones.push({ x: denX, z: denZ, radius: 7.5, key: 'hackers_den', ring: denPadRing });
+
+  // Green spotlight over the den
+  const denSpot = new THREE.PointLight(0x9fef00, 1.6, 35, 2);
+  denSpot.position.set(denX, 12, denZ);
+  scene.add(denSpot);
+
+  // ─────────────── ⚙️ BACKEND ZONE — "Server Room" at (80, 0, -10) ───────────────
+  const srvX = 80, srvZ = -10;
+  const srvGroup = new THREE.Group();
+  srvGroup.position.set(srvX, 0, srvZ);
+  scene.add(srvGroup);
+
+  // Pad — dark blue with cyan emissive (datacenter vibe)
+  const srvPad = new THREE.Mesh(
+    new THREE.CylinderGeometry(8, 8, 0.18, 48),
+    new THREE.MeshStandardMaterial({ color: 0x0a1a26, emissive: 0x004466, emissiveIntensity: 0.3 })
+  );
+  srvPad.position.y = 0.05;
+  srvGroup.add(srvPad);
+  const srvPadRing = new THREE.Mesh(
+    new THREE.RingGeometry(7.8, 8.1, 64),
+    new THREE.MeshBasicMaterial({ color: 0x5ce5ff, transparent: true, opacity: 0.7 })
+  );
+  srvPadRing.rotation.x = -Math.PI/2;
+  srvPadRing.position.y = 0.07;
+  srvGroup.add(srvPadRing);
+  const srvTitleLab = makeLabel('SERVER ROOM', '#5ce5ff', 130);
+  srvTitleLab.position.set(0, 7, 0);
+  srvTitleLab.scale.set(1.2, 1.2, 1.2);
+  srvGroup.add(srvTitleLab);
+
+  // ─── B1: Microservices Farm — 5 service buildings ───
+  const microservices = [
+    { name: 'auth',         color: 0xffe066, pulse: 1.0  },
+    { name: 'payments',     color: 0xff8a6e, pulse: 2.5  },
+    { name: 'queue',        color: 0x9fef00, pulse: 4.0  },
+    { name: 'user-db',      color: 0x5ce5ff, pulse: 0.7  },
+    { name: 'cache-redis',  color: 0xff6a3a, pulse: 6.0  },
+  ];
+  const msPulses = [];
+  for (let i = 0; i < microservices.length; i++) {
+    const m = microservices[i];
+    const mx = -10 + (i % 5) * 4.5;
+    const mz = 12;
+    const buildingMat = new THREE.MeshStandardMaterial({
+      color: 0x14182a, emissive: m.color, emissiveIntensity: 0.45, roughness: 0.5, metalness: 0.3,
+    });
+    const mb = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 3), buildingMat);
+    mb.position.set(mx, 2, mz);
+    mb.castShadow = true;
+    srvGroup.add(mb);
+    // Top blink LED
+    const blink = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 10, 8),
+      new THREE.MeshStandardMaterial({ color: m.color, emissive: m.color, emissiveIntensity: 1.4 })
+    );
+    blink.position.set(mx, 4.3, mz);
+    srvGroup.add(blink);
+    // Service name label
+    const msLab = makeLabel(m.name, '#5ce5ff', 80);
+    msLab.position.set(mx, 0.5, mz + 1.7);
+    msLab.scale.set(0.32, 0.32, 0.32);
+    srvGroup.add(msLab);
+    msPulses.push({ blink, pulseRate: m.pulse, mat: buildingMat, baseEmissive: 0.45 });
+  }
+
+  // ─── B2: Live Deployment Pipeline — 4-stage track with traveling token ───
+  const pipelineStages = ['commit', 'build', 'test', 'deploy'];
+  const stageBoxes = [];
+  for (let i = 0; i < pipelineStages.length; i++) {
+    const sx = -8 + i * 4;
+    const sz = 22;
+    const stage = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 0.4, 1.6),
+      new THREE.MeshStandardMaterial({ color: 0x1a2030, emissive: 0x5ce5ff, emissiveIntensity: 0.2 })
+    );
+    stage.position.set(sx, 0.5, sz);
+    srvGroup.add(stage);
+    stageBoxes.push(stage);
+    const stageLab = makeLabel(pipelineStages[i], '#5ce5ff', 80);
+    stageLab.position.set(sx, 1.3, sz);
+    stageLab.scale.set(0.32, 0.32, 0.32);
+    srvGroup.add(stageLab);
+  }
+  // Connecting rail between stages
+  const pipeRail = new THREE.Mesh(
+    new THREE.BoxGeometry(14, 0.08, 0.3),
+    new THREE.MeshBasicMaterial({ color: 0x5ce5ff, transparent: true, opacity: 0.6 })
+  );
+  pipeRail.position.set(-2, 0.85, 22);
+  srvGroup.add(pipeRail);
+  // Glowing token that animates along the rail
+  const pipeToken = new THREE.Mesh(
+    new THREE.SphereGeometry(0.25, 12, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffe066, emissiveIntensity: 1.6 })
+  );
+  pipeToken.position.set(-8, 0.95, 22);
+  srvGroup.add(pipeToken);
+
+  // ─── B6: Container Orchestra — 3 boxes for web/mp/caddy with health pulse ───
+  const containers = [
+    { name: 'web',   color: 0x5ce5ff },
+    { name: 'mp',    color: 0x9fef00 },
+    { name: 'caddy', color: 0xffe066 },
+  ];
+  const containerBoxes = [];
+  for (let i = 0; i < containers.length; i++) {
+    const c = containers[i];
+    const cx = -6 + i * 4;
+    const cz = -10;
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 1.6, 2.4),
+      new THREE.MeshStandardMaterial({
+        color: 0x14182a,
+        emissive: c.color, emissiveIntensity: 0.5,
+        roughness: 0.4, metalness: 0.3,
+      })
+    );
+    box.position.set(cx, 0.85, cz);
+    box.castShadow = true;
+    srvGroup.add(box);
+    const cLab = makeLabel(c.name, '#5ce5ff', 80);
+    cLab.position.set(cx, 1.85, cz);
+    cLab.scale.set(0.32, 0.32, 0.32);
+    srvGroup.add(cLab);
+    containerBoxes.push({ box, color: c.color, name: c.name });
+  }
+  const orchestraLab = makeLabel('CONTAINER ORCHESTRA', '#5ce5ff', 100);
+  orchestraLab.position.set(-2, 3.0, -10);
+  orchestraLab.scale.set(0.5, 0.5, 0.5);
+  srvGroup.add(orchestraLab);
+
+  // ─── B7: Code Metrics Observatory — 4 dial gauges ───
+  const gauges = [
+    { name: 'LoC',     value: 12480, max: 50000, color: 0x5ce5ff, x: 8 },
+    { name: 'repos',   value: 18,    max: 50,    color: 0x9fef00, x: 11 },
+    { name: 'stars',   value: 47,    max: 200,   color: 0xffe066, x: 14 },
+    { name: 'streak',  value: 23,    max: 100,   color: 0xff6a3a, x: 17 },
+  ];
+  for (const g of gauges) {
+    // Backplate
+    const back = new THREE.Mesh(
+      new THREE.CircleGeometry(1.0, 32),
+      new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.5 })
+    );
+    back.position.set(g.x, 3, -2);
+    srvGroup.add(back);
+    // Outer ring
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.92, 1.0, 32),
+      new THREE.MeshBasicMaterial({ color: g.color })
+    );
+    ring.position.set(g.x, 3, -1.99);
+    srvGroup.add(ring);
+    // Needle (rotates based on value/max)
+    const angle = -Math.PI / 2 + (g.value / g.max) * Math.PI * 1.5;
+    const needle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.7, 0.08),
+      new THREE.MeshBasicMaterial({ color: g.color })
+    );
+    needle.position.set(g.x + Math.cos(angle) * 0.35, 3 + Math.sin(angle) * 0.35, -1.97);
+    needle.rotation.z = angle - Math.PI / 2;
+    srvGroup.add(needle);
+    // Label below
+    const gLab = makeLabel(`${g.name}: ${g.value}`, '#5ce5ff', 60);
+    gLab.position.set(g.x, 1.7, -2);
+    gLab.scale.set(0.2, 0.2, 0.2);
+    srvGroup.add(gLab);
+  }
+  const obsLab = makeLabel('METRICS OBSERVATORY', '#5ce5ff', 100);
+  obsLab.position.set(12.5, 4.5, -2);
+  obsLab.scale.set(0.5, 0.5, 0.5);
+  srvGroup.add(obsLab);
+
+  // Cyan spotlight over the server room
+  const srvSpot = new THREE.PointLight(0x5ce5ff, 1.6, 35, 2);
+  srvSpot.position.set(srvX, 12, srvZ);
+  scene.add(srvSpot);
+
+  // Add as zone for press-E interaction
+  zones.push({ x: srvX, z: srvZ, radius: 7.5, key: 'server_room', ring: srvPadRing });
+
+  // Expose backend zone state for tick animation + HTML interactions
+  window.__imranBackend = {
+    msPulses, pipeToken, containerBoxes,
+    pipeT: 0,
+  };
 
   // ─────────────── PROCEDURAL BUILDINGS (3 variants, district-themed) ───────────────
   // A: Terracotta home (warm earthy)
@@ -2633,7 +4588,7 @@
         for (const cz of [-1, 1]) {
           const edge = new THREE.Mesh(
             new THREE.CylinderGeometry(0.07, 0.07, h, 6),
-            new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 1.4 })
+            new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 1.4 })
           );
           edge.position.set(cx * (w/2), h/2, cz * (d/2));
           g.add(edge);
@@ -2648,7 +4603,7 @@
       g.add(antenna);
       const blink = new THREE.Mesh(
         new THREE.SphereGeometry(0.14, 10, 8),
-        new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 1.6 })
+        new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 1.6 })
       );
       blink.position.y = h + 2.5;
       g.add(blink);
@@ -2658,27 +4613,166 @@
     scene.add(g);
   }
 
-  // Place ~30 buildings around the perimeter, away from main driving zones
+  // Place ~25 buildings around the perimeter, district-themed (urban-architect plan).
+  // Removed all buildings that overlapped the river bed (54,0)(54,-8)(56,18)(44,38)(38,44).
+  // Relocated tech-park type-C neon towers WEST to Hacker's Den approach (cybersec aesthetic).
   const BUILDING_SPOTS = [
     // Downtown cluster (north-west, near about zone)
     [-44, -32, 'A'], [-44, -42, 'B'], [-32, -44, 'A'], [-44, -22, 'C'],
     [-58, -34, 'B'], [-32, -55, 'A'], [-44, -52, 'C'],
-    // Tech park (north-east, around projects/billboard)
-    [44, 16, 'C'], [44, 28, 'C'], [56, 18, 'B'], [44, 38, 'A'],
-    [56, 28, 'C'], [38, 44, 'A'],
-    // Skill alley (east side)
-    [44, -16, 'C'], [44, -28, 'C'], [56, -22, 'B'], [44, -38, 'A'],
+    // Tech Park flankers (around new Projects billboard at x=45, z=0) — cream brick studios
+    [55, 8, 'B'], [50, -5, 'B'],
     // Mailroom (south)
     [-18, -55, 'A'], [16, -55, 'A'], [-30, -68, 'B'], [22, -68, 'B'],
-    // Social Boulevard backdrop — moved behind the social arches at z=78
+    // Social Boulevard backdrop (north edge, behind socials at z=60)
     [-40, 78, 'C'], [-22, 78, 'C'], [-2, 78, 'C'], [22, 78, 'C'], [40, 78, 'C'],
-    // Riverside east tall buildings
-    [54, 0, 'C'], [54, -8, 'B'],
-    // Edge fillers
+    // Hacker's Den approach — relocated neon towers (Tron palette fits cybersec aesthetic)
+    [-50, 0, 'C'], [-60, 10, 'C'], [-50, 20, 'C'], [-65, -10, 'C'], [-75, 10, 'C'], [-90, 0, 'C'],
+    // Edge fillers (west)
     [-58, 4, 'A'], [-58, 16, 'B'],
   ];
   for (const [x, z, t] of BUILDING_SPOTS) {
     addBuilding(x, z, t, Math.random() * Math.PI * 2);
+  }
+
+  // ─────────────── 🌉 FLYOVER (elevated bridge over Pasha Boulevard) ───────────────
+  // Approach ramp on -x side rises from y=0 to y=4 over 10m, then a 16m flat span,
+  // then ramp down on +x side. Crosses over the road at z=0.
+  function addRoadRamp(cx, cy, cz, len, height, axis = 'x', side = 1) {
+    // axis 'x' means ramp along X direction; side = +1 ascending from -X to +X, -1 descending.
+    // rotation.z = +ang tilts the +X end UP (Three.js Z-axis right-hand rule), so for
+    // an ascending-east ramp (side=+1) we want rotation = +ang. side=-1 flips the slope.
+    const ang = Math.atan2(height, len);
+    const ramp = new THREE.Mesh(
+      new THREE.BoxGeometry(len, 0.4, 5),
+      new THREE.MeshStandardMaterial({ color: 0x3e3848, roughness: 0.9 })
+    );
+    ramp.position.set(cx, cy, cz);
+    ramp.rotation.z = ang * side;
+    ramp.castShadow = true; ramp.receiveShadow = true;
+    scene.add(ramp);
+    // Yellow lane line along the top of the ramp
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(len * 0.95, 0.05, 0.18),
+      new THREE.MeshBasicMaterial({ color: 0xffe066 })
+    );
+    stripe.position.set(cx, cy + 0.22, cz);
+    stripe.rotation.z = ang * side;
+    scene.add(stripe);
+    // Physics body — must match the visual rotation exactly
+    const rampBody = new CANNON.Body({ mass: 0, material: groundMat });
+    rampBody.addShape(new CANNON.Box(new CANNON.Vec3(len/2, 0.2, 2.5)));
+    rampBody.position.set(cx, cy, cz);
+    rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), ang * side);
+    world.addBody(rampBody);
+  }
+  // Flyover #1 — over Pasha Blvd. Gentler 14° angle so the car drives up smoothly.
+  // Lower height (3.5m) and longer ramps (18m). Ramp CENTER y = FLY_H/2 puts the LOW end at
+  // ground (y=0) and the HIGH end exactly at the span level (y=FLY_H), perfectly drivable.
+  const FLY_H = 3.5;
+  addRoadRamp(33, FLY_H/2, 0, 18, FLY_H, 'x', 1);
+  // Flat span over the boulevard
+  const flySpan = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.4, 5),
+    new THREE.MeshStandardMaterial({ color: 0x3e3848, roughness: 0.9 })
+  );
+  flySpan.position.set(50, FLY_H, 0);
+  flySpan.castShadow = true; flySpan.receiveShadow = true;
+  scene.add(flySpan);
+  // Span lane stripe
+  const flySpanStripe = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.05, 0.18),
+    new THREE.MeshBasicMaterial({ color: 0xffe066 })
+  );
+  flySpanStripe.position.set(50, FLY_H + 0.22, 0);
+  scene.add(flySpanStripe);
+  // Span railings (cyan glow accents)
+  for (const dz of [-2.4, 2.4]) {
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(16, 0.5, 0.15),
+      new THREE.MeshStandardMaterial({ color: 0x5ce5ff, emissive: 0x5ce5ff, emissiveIntensity: 0.6 })
+    );
+    rail.position.set(50, FLY_H + 0.7, dz);
+    scene.add(rail);
+  }
+  // Span physics
+  const flySpanBody = new CANNON.Body({ mass: 0, material: groundMat });
+  flySpanBody.addShape(new CANNON.Box(new CANNON.Vec3(8, 0.2, 2.5)));
+  flySpanBody.position.set(50, FLY_H, 0);
+  world.addBody(flySpanBody);
+  // Support pillars under the span
+  for (const px of [42, 50, 58]) {
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, FLY_H, 0.8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3848, roughness: 0.85 })
+    );
+    pillar.position.set(px, FLY_H/2, 0);
+    pillar.castShadow = true;
+    scene.add(pillar);
+  }
+  // Descend ramp on the other side (also longer + gentler) — center y = FLY_H/2 so it
+  // meets the span at HIGH (-X end) and ground at LOW (+X end).
+  addRoadRamp(67, FLY_H/2, 0, 18, FLY_H, 'x', -1);
+
+  // ─────────────── 🚇 TUNNEL (covered roadway through buildings) ───────────────
+  // 24m tunnel along Imran Avenue (x=0) between z=-50 and z=-26. Roof prevents top-down view inside.
+  const TUNNEL_LEN = 24;
+  const tunnelZ = -38;
+  // Tunnel walls (left + right) — solid black with cyan accent stripe
+  for (const dx of [-3.5, 3.5]) {
+    const wall = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 4.5, TUNNEL_LEN),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.8 })
+    );
+    wall.position.set(dx, 2.25, tunnelZ);
+    wall.castShadow = true; wall.receiveShadow = true;
+    scene.add(wall);
+    // Physics for the wall (so car bumps off inside)
+    const wallBody = new CANNON.Body({ mass: 0, material: groundMat });
+    wallBody.addShape(new CANNON.Box(new CANNON.Vec3(0.4, 2.25, TUNNEL_LEN/2)));
+    wallBody.position.set(dx, 2.25, tunnelZ);
+    world.addBody(wallBody);
+    // Cyan emissive light strip running along the inside top of each wall
+    const lightStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.15, TUNNEL_LEN - 0.4),
+      new THREE.MeshBasicMaterial({ color: 0x5ce5ff })
+    );
+    lightStrip.position.set(dx + (dx > 0 ? -0.42 : 0.42), 4.0, tunnelZ);
+    scene.add(lightStrip);
+  }
+  // Tunnel roof
+  const tunnelRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(7.5, 0.4, TUNNEL_LEN),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a26, roughness: 0.85 })
+  );
+  tunnelRoof.position.set(0, 4.6, tunnelZ);
+  tunnelRoof.castShadow = true;
+  scene.add(tunnelRoof);
+  // Roof physics so plane mode + jumps can't go through
+  const tunnelRoofBody = new CANNON.Body({ mass: 0, material: groundMat });
+  tunnelRoofBody.addShape(new CANNON.Box(new CANNON.Vec3(3.75, 0.2, TUNNEL_LEN/2)));
+  tunnelRoofBody.position.set(0, 4.6, tunnelZ);
+  world.addBody(tunnelRoofBody);
+  // Tunnel entrance/exit "TUNNEL" labels above each opening
+  for (const ez of [tunnelZ - TUNNEL_LEN/2 - 0.3, tunnelZ + TUNNEL_LEN/2 + 0.3]) {
+    const archFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(8.5, 0.6, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x14101e, emissive: 0x5ce5ff, emissiveIntensity: 0.4 })
+    );
+    archFrame.position.set(0, 4.95, ez);
+    scene.add(archFrame);
+    const tnLab = makeLabel('TUNNEL', '#5ce5ff', 90);
+    tnLab.position.set(0, 4.95, ez + (ez > tunnelZ ? 0.3 : -0.3));
+    tnLab.scale.set(0.4, 0.4, 0.4);
+    if (ez < tunnelZ) tnLab.rotation.y = Math.PI;
+    tnLab.userData.noBillboard = true;
+    scene.add(tnLab);
+  }
+  // Interior tunnel point lights for ambience
+  for (let i = -1; i <= 1; i++) {
+    const tlight = new THREE.PointLight(0x5ce5ff, 0.6, 12, 2);
+    tlight.position.set(0, 4.0, tunnelZ + i * 8);
+    scene.add(tlight);
   }
 
   // ─ ABOUT ZONE (Downtown anchor — civil engineer plan)
@@ -2757,7 +4851,7 @@
 
   // ─ PROJECTS ZONE — 5 floating billboards
   const PROJECTS = [
-    { name: 'MERN+GraphQL', url: 'https://github.com/Imranpasha30/MERN-GraphQL', color: 0xff3e8a },
+    { name: 'MERN+GraphQL', url: 'https://github.com/Imranpasha30/MERN-GraphQL', color: 0xffb070 },
     { name: 'ChatZ', url: 'https://github.com/Imranpasha30/ChatZ', color: 0x8a3eff },
     { name: 'Logistics', url: 'https://github.com/Imranpasha30/Logistics', color: 0x5ce5ff },
     { name: 'Travellers', url: 'https://github.com/Imranpasha30/Travellers', color: 0xffe066 },
@@ -2859,7 +4953,7 @@
   }
   // Control labels
   const ctrlLines = [
-    { text: 'NEXT  N→', color: '#ff3e8a' },
+    { text: 'NEXT  N→', color: '#ffb070' },
     { text: 'PREV  ←P', color: '#5ce5ff' },
     { text: 'OPEN  E↵', color: '#ffe066' },
     { text: 'EXIT  ESC', color: '#888888' },
@@ -2939,7 +5033,7 @@
     { name: 'React',    icon: '⚛',  color: 0x5ce5ff },
     { name: 'Node',     icon: 'JS', color: 0x9bc41a },
     { name: 'Mongo',    icon: '🍃', color: 0x4ad962 },
-    { name: 'GraphQL',  icon: '◆',  color: 0xff3e8a },
+    { name: 'GraphQL',  icon: '◆',  color: 0xffb070 },
     { name: 'Python',   icon: '🐍', color: 0xffe066 },
     { name: 'Docker',   icon: '🐳', color: 0x5cb8ff },
     { name: 'AWS',      icon: '☁',  color: 0xff9933 },
@@ -2981,11 +5075,14 @@
   }
 
   const skillBodies = [];
+  // Skills cluster relocated to (60, -10) — directly in front of the Server Room.
+  // Reads as "engineering campus entrance" (urban architect plan).
+  const SKILLS_X = 60, SKILLS_Z = -10;
   SKILLS.forEach((s, i) => {
     const ang = (i / SKILLS.length) * Math.PI * 2;
     const r = 5;
-    const x = 30 + Math.cos(ang) * r;
-    const z = -28 + Math.sin(ang) * r;
+    const x = SKILLS_X + Math.cos(ang) * r;
+    const z = SKILLS_Z + Math.sin(ang) * r;
     const w = 1.5, h = 1.5, d = 1.5;        // square icon-cubes (was tall pins)
     const sideMat = new THREE.MeshStandardMaterial({
       color: s.color, emissive: s.color, emissiveIntensity: 0.25, roughness: 0.4
@@ -3017,14 +5114,14 @@
     objects.push({ mesh, body, lab, labYOffset: 0 });
     skillBodies.push(body);
   });
-  addZonePad(30, -28, COL.purple, 'SKILLS', 'skills', 7.5);
+  addZonePad(SKILLS_X, SKILLS_Z, COL.purple, 'SKILLS', 'skills', 7.5);
 
   // ─ CONTACT ZONE — giant mailbox in Mailroom cul-de-sac (south terminus)
   const mailboxX = 0, mailboxZ = -70;
   addZonePad(mailboxX, mailboxZ, COL.yellow, 'CONTACT', 'contact', 5);
-  const mbBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 4), new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: COL.pink, emissiveIntensity: 0.2, roughness: 0.4 }));
+  const mbBox = new THREE.Mesh(new THREE.BoxGeometry(3, 2.4, 4), new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: COL.pink, emissiveIntensity: 0.2, roughness: 0.4 }));
   mbBox.position.set(mailboxX, 2.5, mailboxZ); mbBox.castShadow = true; scene.add(mbBox);
-  const mbTop = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 16, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: COL.pink, emissiveIntensity: 0.3 }));
+  const mbTop = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 16, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: COL.pink, emissiveIntensity: 0.3 }));
   mbTop.rotation.z = Math.PI/2; mbTop.position.set(mailboxX, 3.7, mailboxZ); mbTop.castShadow = true; scene.add(mbTop);
   const mbPost = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x222 }));
   mbPost.position.set(mailboxX, 0.75, mailboxZ); scene.add(mbPost);
@@ -3191,7 +5288,7 @@
   const loopX = -65, loopZ = 65, loopR = 9;
   const loopMesh = new THREE.Mesh(
     new THREE.TorusGeometry(loopR, 1.2, 12, 48),
-    new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 0.4, roughness: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 0.4, roughness: 0.4 })
   );
   loopMesh.position.set(loopX, loopR, loopZ);
   scene.add(loopMesh);
@@ -3221,7 +5318,7 @@
   // Entrance ramp: -X side leading up to the bottom-of-loop entry at y ≈ 1.
   const loopRamp = new THREE.Mesh(
     new THREE.BoxGeometry(8, 0.4, 5),
-    new THREE.MeshStandardMaterial({ color: 0xff3e8a, emissive: 0xff3e8a, emissiveIntensity: 0.25 })
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xffb070, emissiveIntensity: 0.25 })
   );
   const rampAng = Math.atan2(1.0, 8.0); // rises 1 unit over 8 length
   loopRamp.position.set(loopX - R_inner - 4, 0.5, loopZ);
@@ -3240,37 +5337,81 @@
 
   // ─────────────── LABEL BILLBOARDING + ZONE TICK ───────────────
   const billboardLabels = [];
-  scene.traverse(o => { if (o.material && o.material.map && o.geometry && o.geometry.type === 'PlaneGeometry') billboardLabels.push(o); });
+  // Skip labels marked userData.noBillboard = true (e.g. welcome arch keystone — stays painted on the wood)
+  scene.traverse(o => {
+    if (o.material && o.material.map && o.geometry && o.geometry.type === 'PlaneGeometry'
+        && !(o.userData && o.userData.noBillboard)) {
+      billboardLabels.push(o);
+    }
+  });
 
   // ─────────────── CAMERA ───────────────
   const camTarget = new THREE.Vector3();
   const camPos = new THREE.Vector3();
 
-  // ─── CINEMATIC INTRO STATE ───
+  // ─── CINEMATIC INTRO — single smooth fly-over passing through landmarks ───
+  // Like the original sweep, but the path now curves through a series of waypoints
+  // so you GLIMPSE each landmark as you fly past. Catmull-Rom spline = continuous,
+  // never cuts. Camera + look-at both interpolate along their own splines.
+  // 30-second cinematic — high overview → zoom in → airport → balloon → harbour → city overview → settle
+  const CINEMATIC_DURATION = 30.0;
+  const CINE_CAM_PATH = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(   0, 250,  220),   //  0. very high overview — whole world visible
+    new THREE.Vector3( -30, 180,  130),   //  1. zoom-in / start descending
+    new THREE.Vector3( -70, 110,   30),   //  2. continue down toward airport
+    new THREE.Vector3(-110,  60,  -50),   //  3. drop into airport airspace
+    new THREE.Vector3(-130,  35, -110),   //  4. low pass alongside runway
+    new THREE.Vector3( -60,  40, -130),   //  5. swing east from airport
+    new THREE.Vector3(  20,  45, -130),   //  6. heading toward balloon station
+    new THREE.Vector3(  50,  40,  -90),   //  7. arrive at balloon station, view from above
+    new THREE.Vector3(  90,  45,  -50),   //  8. depart balloon, climb toward harbour
+    new THREE.Vector3( 130,  50,   30),   //  9. approaching harbour
+    new THREE.Vector3( 140,  40,  100),   // 10. above harbour ships + lighthouse
+    new THREE.Vector3(  90,  60,  120),   // 11. pull up for city overview
+    new THREE.Vector3(  30,  80,   90),   // 12. high city overview swing
+    new THREE.Vector3( -20,  60,   50),   // 13. descend over city center
+    new THREE.Vector3(  10,  25,   30),   // 14. approach welcome plaza
+    new THREE.Vector3(   0,   8,   18),   // 15. settle into chase spot at spawn
+  ], false, 'catmullrom', 0.5);
+  const CINE_LOOK_PATH = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(   0,  0,    0),    //  0. center of world from way up
+    new THREE.Vector3( -30,  0,    0),    //  1. drift slightly west
+    new THREE.Vector3( -90,  5,  -50),    //  2. airport area
+    new THREE.Vector3(-110,  3, -110),    //  3. airport runway
+    new THREE.Vector3(-110,  8, -132),    //  4. terminal
+    new THREE.Vector3(   0,  5, -110),    //  5. east toward balloon station
+    new THREE.Vector3(  50,  8, -110),    //  6. balloon station pad
+    new THREE.Vector3(  50, 30, -110),    //  7. balloons rising from station
+    new THREE.Vector3(  90,  4,  -65),    //  8. lake
+    new THREE.Vector3( 130,  1,  120),    //  9. harbour ships
+    new THREE.Vector3( 145, 12,   92),    // 10. lighthouse
+    new THREE.Vector3(  40, 11,   30),    // 11. cable car station (city overview anchor)
+    new THREE.Vector3(   0,  3,    0),    // 12. plaza (city overview)
+    new THREE.Vector3( -50,  3,   30),    // 13. HTB skull (gateway visible)
+    new THREE.Vector3(   0,  9,   12),    // 14. welcome arch
+    new THREE.Vector3(   0,  1.5,   0),   // 15. spawn / car
+  ], false, 'catmullrom', 0.5);
   let cinematicActive = false;
   let cinematicT = 0;
-  const CINEMATIC_DURATION = 6.0;   // seconds
   function startCinematic() {
     cinematicActive = true;
     cinematicT = 0;
-    // Show overlay text (HTML side picks up this event)
     window.dispatchEvent(new Event('imran:cinematic:start'));
+  }
+  function easeInOut(u) {
+    return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
   }
 
   function updateCamera(dt, isStarted) {
     if (cinematicActive) {
-      // Sweeping fly-over: high in NW, swings down toward spawn
       cinematicT += dt;
       const u = Math.min(1, cinematicT / CINEMATIC_DURATION);
-      // Ease in/out cubic
-      const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      // Start position high & far, end position at chase camera resting spot
-      const startPos = new THREE.Vector3(-90, 60, 80);
-      const endPos = new THREE.Vector3(0, 8, 18);
-      camera.position.lerpVectors(startPos, endPos, e);
-      // Look at center spawn area, with slow downward tilt at the end
-      const lookT = new THREE.Vector3(0, 1.5 + (1 - e) * 4, 0);
-      camera.lookAt(lookT);
+      const e = easeInOut(u);
+      // Sample both splines at the same eased t — gives a smooth, cinematic sweep
+      const camPos2 = CINE_CAM_PATH.getPoint(e);
+      const lookPos = CINE_LOOK_PATH.getPoint(e);
+      camera.position.copy(camPos2);
+      camera.lookAt(lookPos);
       if (cinematicT >= CINEMATIC_DURATION) {
         cinematicActive = false;
         window.dispatchEvent(new Event('imran:cinematic:end'));
@@ -3282,6 +5423,72 @@
       const t = clock.getElapsedTime();
       camera.position.set(Math.cos(t * 0.10) * 18, 5, Math.sin(t * 0.10) * 18);
       camera.lookAt(0, 1.5, 0);
+      return;
+    }
+    // ─── Walking-mode camera (chase the man) ───
+    if (playerMode === 'walk') {
+      const m = manGroup.position;
+      const t = clock.getElapsedTime();
+      // Follow at fixed angle behind, allow mouse orbit
+      const dist = 7 + orbit.zoom;
+      const camYawW = walkYaw + orbit.yawOff;
+      camTarget.set(m.x, m.y + 1.4, m.z);
+      camPos.set(
+        m.x + Math.sin(camYawW) * dist,
+        m.y + 4,
+        m.z + Math.cos(camYawW) * dist
+      );
+      camera.position.lerp(camPos, 0.18);
+      camera.lookAt(camTarget);
+      return;
+    }
+    // ─── Cable-car ride POV — sit inside the gondola, look out the "window" toward town & mountains ───
+    if (playerMode === 'cable_ride' && rideTarget) {
+      const r = rideTarget.position;
+      const t = clock.getElapsedTime();
+      // Camera is inside the gondola at "passenger eye level" (roughly basket-floor height)
+      camPos.set(r.x, r.y + 1.2, r.z);
+      // Cycle through scenic look-at targets so the player feels the gondola is rotating to take in the view.
+      // Each target is held for a few seconds, then blended into the next.
+      const lookTargets = [
+        new THREE.Vector3(   0,   5,    0),    // welcome plaza (city center)
+        new THREE.Vector3(  85,  30,   65),    // observation tower
+        new THREE.Vector3( 110,   5,  110),    // harbour
+        new THREE.Vector3( 200,  60,   50),    // mountain peak east
+        new THREE.Vector3( -50,   3,   30),    // HTB skull
+        new THREE.Vector3(-130,  60,   80),    // mountain peak NW
+        new THREE.Vector3( -110,   5, -110),   // airport in distance
+        new THREE.Vector3( 180,  70, -150),    // mountain peak SE (distant)
+      ];
+      // Slow blend through the targets — each target ~5 sec
+      const cycleT = (t * 0.2) % lookTargets.length;
+      const i0 = Math.floor(cycleT);
+      const i1 = (i0 + 1) % lookTargets.length;
+      const blend = cycleT - i0;
+      const smooth = blend * blend * (3 - 2 * blend);    // smoothstep
+      const target = lookTargets[i0].clone().lerp(lookTargets[i1], smooth);
+      camera.position.copy(camPos);
+      camera.lookAt(target);
+      return;
+    }
+    // ─── Hot-air-balloon ride POV — inside the basket, looks out & slightly down at the world ───
+    if (playerMode === 'balloon_ride' && rideTarget) {
+      const r = rideTarget.position;
+      const t = clock.getElapsedTime();
+      // Camera sits at basket rim height (basket center is at +1.5 of balloon group)
+      camPos.set(r.x, r.y + 1.8, r.z);
+      // Slow horizontal pan so the player feels the balloon is rotating
+      const panAng = t * 0.12;
+      // Look outward AND slightly down — the magic of a balloon view is seeing the world below
+      const dist = 40;
+      const dropY = -25;     // 25m below current altitude
+      camTarget.set(
+        r.x + Math.cos(panAng) * dist,
+        r.y + dropY,
+        r.z + Math.sin(panAng) * dist
+      );
+      camera.position.copy(camPos);
+      camera.lookAt(camTarget);
       return;
     }
     // Camera follows car (chase / top-down / first-person)
@@ -3370,7 +5577,13 @@
       const dt = Math.min(clock.getDelta(), 1/30);
       if (started) {
         let drv;
-        if (flyMode) {
+        if (playerMode === 'walk') {
+          // Walking — bypass car physics, integrate man position directly
+          drv = walkStep(dt);
+        } else if (playerMode === 'cable_ride' || playerMode === 'balloon_ride') {
+          // Riding — no input, just animation
+          drv = { speed: 0, throttle: 0 };
+        } else if (flyMode) {
           drv = flyStep(dt);
         } else {
           drv = driveStep(dt);
@@ -3422,6 +5635,120 @@
       sun.rotation.z = t * 0.05;
       // River wave animation
       riverMat.uniforms.uTime.value = t;
+
+      // ─── Visitor Tower animation (crystal rotation, light pulse, +1 fade, ticker scroll) ───
+      if (window.__imranTowerAnim) {
+        const ta = window.__imranTowerAnim;
+        ta.crystal.rotation.y = t * 0.6;
+        ta.crystal.rotation.x = Math.sin(t * 0.4) * 0.1;
+        ta.crystal.position.y = 9.5 + Math.sin(t * 1.2) * 0.15;
+        ta.light.intensity = 1.4 + Math.sin(t * 2) * 0.3;
+        // +1 floating animation fade
+        if (ta.state.plusOneT > 0) {
+          ta.state.plusOneT -= dt * 0.6;
+          if (ta.state.plusOneT < 0) ta.state.plusOneT = 0;
+          ta.draw();
+        }
+        // Scroll the guestbook ticker continuously (~20 px/sec) — redraw at ~8fps for perf
+        tickerScroll = (tickerScroll || 0) + dt * 20;
+        if (!ta._lastDraw || t - ta._lastDraw > 0.12) {
+          ta._lastDraw = t;
+          ta.drawTicker();
+        }
+      }
+
+      // ─── Switzerland animations (cable car, rally checkpoints, cowbell) ───
+      if (window.__imranSwiss) {
+        const sw = window.__imranSwiss;
+        // Cable car ping-pong every 60 sec end-to-end
+        cableT += dt * cableDirSign / 60;
+        if (cableT >= 1) { cableT = 1; cableDirSign = -1; }
+        if (cableT <= 0) { cableT = 0; cableDirSign = 1; }
+        const gondolaPos = sw.cableStart.clone().lerp(sw.cableEnd, cableT);
+        sw.gondola.position.copy(gondolaPos);
+
+        // Rally checkpoint pickup detection
+        const cp = carGroup.position;
+        for (const r of sw.rallyCheckpoints) {
+          if (r.collected) continue;
+          const d = Math.hypot(cp.x - r.x, cp.z - r.z);
+          if (d < 2.5) {
+            r.collected = true;
+            scene.remove(r.ring); scene.remove(r.beam);
+            sw.incrementRally();
+            const got = sw.rallyCount();
+            if (window.__imranToast) window.__imranToast(`🚩 RALLY CHECKPOINT ${got}/5`);
+            if (got === 5 && window.__imranToast) {
+              setTimeout(() => window.__imranToast('🏆 BACKROAD CHAMPION — all 5 rally checkpoints!'), 800);
+            }
+          } else {
+            r.ring.rotation.z = t * 1.5;
+            r.beam.material.opacity = 0.12 + Math.sin(t * 3) * 0.08;
+          }
+        }
+
+        // Cowbell ambient — distant ding when near mountains
+        if (window.__imranCowbellTick) window.__imranCowbellTick(performance.now());
+      }
+
+      // Wildflower gentle sway (subtle vertical bob)
+      if (typeof wildflowers !== 'undefined') {
+        wildflowers.position.y = Math.sin(t * 0.7) * 0.05;
+      }
+
+      // ─── Airport + Harbour animations (planes loop takeoff/land, ships orbit harbour) ───
+      if (window.__imranAirport) window.__imranAirport.tick(dt);
+      if (window.__imranHarbour) window.__imranHarbour.tick(dt);
+      if (window.__imranBalloons) window.__imranBalloons.tick(dt);
+      if (window.__imranFisher) window.__imranFisher.tick(t);
+
+      // ─── Backend Zone animations (microservice pulses, pipeline token, container health) ───
+      if (window.__imranBackend) {
+        const be = window.__imranBackend;
+        // Microservice blink + emissive pulse at each service's rate
+        for (const m of be.msPulses) {
+          const beat = (Math.sin(t * m.pulseRate * Math.PI * 2) + 1) / 2;
+          m.blink.material.emissiveIntensity = 0.3 + beat * 1.6;
+          m.mat.emissiveIntensity = m.baseEmissive + beat * 0.3;
+        }
+        // Pipeline token slides commit→deploy over 6 sec, then loops
+        be.pipeT = (be.pipeT + dt / 6) % 1;
+        const tokenX = -8 + be.pipeT * 12;       // -8 → +4 across the 4 stages
+        be.pipeToken.position.x = tokenX;
+        be.pipeToken.position.y = 0.95 + Math.sin(t * 6) * 0.08;
+        // Container Orchestra — gentle health pulse (all green for now)
+        for (const c of be.containerBoxes) {
+          c.box.material.emissiveIntensity = 0.4 + Math.sin(t * 1.5 + c.name.length) * 0.25;
+        }
+      }
+
+      // ─── PROXIMITY PROMPTS — flyover (M), cable-car (T), and re-enter car (E) ───
+      if (window.__imranToast) {
+        const px = (playerMode === 'walk') ? manGroup.position.x : carGroup.position.x;
+        const pz = (playerMode === 'walk') ? manGroup.position.z : carGroup.position.z;
+        // Flyover proximity (centered at x=50, z=0) → suggest M for walking
+        const distFly = Math.hypot(px - 50, pz);
+        if (distFly < 25 && playerMode === 'car' && (t - (window.__lastFlyHint || 0) > 15)) {
+          window.__imranToast('🚶 press <kbd>M</kbd> to get out and walk');
+          window.__lastFlyHint = t;
+        }
+        // Cable car deck proximity (40, 30) → suggest T for ride
+        const distCable = Math.hypot(px - 40, pz - 30);
+        if (distCable < 14 && playerMode !== 'cable_ride' && (t - (window.__lastCableHint || 0) > 15)) {
+          window.__imranToast('🚠 press <kbd>T</kbd> to ride the cable car');
+          window.__lastCableHint = t;
+        }
+        // Walking near the car → suggest E to enter
+        if (playerMode === 'walk') {
+          const distCar = Math.hypot(
+            manGroup.position.x - carGroup.position.x,
+            manGroup.position.z - carGroup.position.z);
+          if (distCar < 5 && (t - (window.__lastEnterHint || 0) > 8)) {
+            window.__imranToast('🚗 press <kbd>E</kbd> to get in the car');
+            window.__lastEnterHint = t;
+          }
+        }
+      }
 
       // ─── DAY/NIGHT CYCLE ───
       if (timeAutoAdvance) timeOfDay = (timeOfDay + dt / 90) % 1;     // 90 sec per full day
@@ -3646,7 +5973,7 @@
           bunkerActive = true;
           stats.foundBunker = true;
           // Teleport camera into the bunker (move car too so the camera follows naturally)
-          window.imranWorld.teleport(-30, 50);
+          window.imranWorld.teleport(-50, 30);
           chassis.position.y = -7.5;
           if (window.__imranToast) window.__imranToast('🥚 SECRET BUNKER UNLOCKED');
         }

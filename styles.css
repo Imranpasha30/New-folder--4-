@@ -6,7 +6,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #1d1a2e; f
 canvas { display: block; outline: none; }
 
 :root {
-  --pink: #ff3e8a;
+  --pink: #ffb070;
   --purple: #8a3eff;
   --cyan: #5ce5ff;
   --yellow: #ffe066;

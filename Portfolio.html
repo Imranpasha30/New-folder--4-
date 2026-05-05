@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="world.css?v=11"/>
+<link rel="stylesheet" href="world.css?v=13"/>
 </head>
 <body>
 
@@ -161,7 +161,7 @@ const ld = setInterval(() => {
 }, 80);
 </script>
 
-<script src="world.js?v=32"></script>
+<script src="world.js?v=48"></script>
 
 <script>
 // Start handler
@@ -459,6 +459,8 @@ function showToast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(() => toast.classList.remove('show'), 2200);
 }
+// Expose globally so world.js can pop toasts directly (walk-mode toggles, ride-mode entry, etc.)
+window.__imranToast = showToast;
 
 const zonePhoto = document.getElementById('zonePhoto');
 function setPhoto(src) {
@@ -519,6 +521,20 @@ function showPanel(z) {
     activeInteractUrl = s.url;
     activeInteractLabel = s.name;
     showInteractPrompt(`🔗 <span class="pink">${s.name}</span> — press <kbd>E</kbd> to open`);
+  } else if (z.key === 'hackers_den') {
+    showInteractPrompt(`🛡️ <span class="pink">HACKER'S DEN</span> — drive around to explore breaches, OWASP padlocks, command library`);
+  } else if (z.key === 'sqli_demo') {
+    activeInteractUrl = '__sqli__';
+    activeInteractLabel = 'SQL Injection Demo';
+    showInteractPrompt(`💉 <span class="pink">SQLi DEMO</span> — press <kbd>E</kbd> to try the bypass`);
+  } else if (z.key === 'server_room') {
+    showInteractPrompt(`⚙️ <span class="pink">SERVER ROOM</span> — microservices, deployment pipeline, container orchestra, metrics`);
+  } else if (z.key === 'phishing_demo') {
+    activeInteractUrl = '__phishing__';
+    activeInteractLabel = 'Phishing Demo';
+    showInteractPrompt(`🎣 <span class="pink">PHISHING DEMO</span> — press <kbd>E</kbd> to see how credentials get phished`);
+  } else if (z.key === 'balloon_ride_pad') {
+    showInteractPrompt(`🎈 <span class="pink">BALLOON RIDE</span> — press <kbd>E</kbd> to take off · <kbd>M</kbd> to land`);
   }
 }
 window.addEventListener('imran:zone', (e) => showPanel(e.detail));
@@ -544,12 +560,119 @@ window.addEventListener('imran:zone', (e) => {
   if (!e.detail) hideInteractPrompt();
 });
 window.addEventListener('imran:interact', () => {
-  if (activeInteractUrl) {
-    if (window.imranSound) window.imranSound.click();
-    window.open(activeInteractUrl, '_blank');
-    showToast(`✨ opening <span class="pink">${activeInteractLabel}</span>`);
+  if (!activeInteractUrl) return;
+  if (window.imranSound) window.imranSound.click();
+  // Special handlers (not URL-opens)
+  if (activeInteractUrl === '__sqli__') {
+    showSqliDemo();
+    return;
   }
+  if (activeInteractUrl === '__phishing__') {
+    showPhishingDemo();
+    return;
+  }
+  window.open(activeInteractUrl, '_blank');
+  showToast(`✨ opening <span class="pink">${activeInteractLabel}</span>`);
 });
+
+// SQLi demo modal — try the bypass interactively
+function showSqliDemo() {
+  let m = document.getElementById('sqliModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'sqliModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:rgba(10,16,8,0.97);border:2px solid #9fef00;border-radius:14px;padding:24px 28px;color:#9fef00;font-family:"JetBrains Mono",monospace;min-width:380px;max-width:90vw;box-shadow:0 0 60px rgba(159,239,0,0.4);';
+    m.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2 style="font-family:'Permanent Marker',cursive;color:#9fef00;font-size:22px;">💉 SQL Injection Demo</h2>
+        <button id="sqliClose" style="background:none;border:none;color:#9fef00;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <p style="margin-bottom:12px;font-size:13px;color:#cfffaa;">The query below is built by string concatenation (BAD). Try entering<br><code style="color:#ffe066;">admin' OR '1'='1</code> in the username field.</p>
+      <pre style="background:#001100;padding:10px;border-radius:6px;font-size:11px;color:#9fef00;overflow:auto;">SELECT * FROM users WHERE username='&lt;input&gt;' AND password='&lt;input&gt;'</pre>
+      <div style="margin:14px 0;display:flex;flex-direction:column;gap:8px;">
+        <input id="sqliUser" placeholder="username" autocomplete="off" style="padding:10px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
+        <input id="sqliPass" type="password" placeholder="password" autocomplete="off" style="padding:10px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
+        <button id="sqliLogin" style="padding:10px;background:#9fef00;border:none;color:#001100;border-radius:6px;cursor:pointer;font-family:'Permanent Marker',cursive;font-size:15px;">attempt login</button>
+      </div>
+      <div id="sqliResult" style="min-height:60px;font-size:12px;line-height:1.5;"></div>
+    `;
+    document.body.appendChild(m);
+    m.querySelector('#sqliClose').addEventListener('click', () => m.remove());
+    m.querySelector('#sqliLogin').addEventListener('click', () => {
+      const u = m.querySelector('#sqliUser').value;
+      const p = m.querySelector('#sqliPass').value;
+      const r = m.querySelector('#sqliResult');
+      const isInjected = /['"\\]|or\s+['"]?\d+['"]?\s*=\s*['"]?\d+/i.test(u + p);
+      if (isInjected) {
+        r.innerHTML = `<div style="color:#ff8a6e;font-weight:bold;">🔓 AUTH BYPASSED!</div>
+        <div style="margin-top:8px;color:#cfffaa;">Your input made the query become:</div>
+        <pre style="background:#001100;padding:8px;border-radius:6px;color:#ffe066;font-size:11px;margin-top:6px;">SELECT * FROM users WHERE username='${u}' AND password='${p}'</pre>
+        <div style="margin-top:12px;color:#cfffaa;">✅ <b>Safe version</b> uses parameterized queries:</div>
+        <pre style="background:#001100;padding:8px;border-radius:6px;color:#9fef00;font-size:11px;margin-top:6px;">db.query('SELECT * FROM users WHERE username=? AND password=?',\n         [username, password])</pre>`;
+      } else {
+        r.innerHTML = `<div style="color:#5ce5ff;">login failed for "${u}". Try the classic <code style="color:#ffe066;">admin' OR '1'='1</code> trick →</div>`;
+      }
+    });
+  } else {
+    m.style.display = 'block';
+  }
+}
+
+// Phishing demo — fake login screen "from your bank" that demonstrates credential phishing.
+function showPhishingDemo() {
+  let m = document.getElementById('phishModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'phishModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#ffffff;border:2px solid #1a3a8c;border-radius:14px;padding:0;color:#222;font-family:system-ui,sans-serif;min-width:420px;max-width:92vw;box-shadow:0 0 60px rgba(255,138,110,0.5);overflow:hidden;';
+    m.innerHTML = `
+      <div style="background:#1a3a8c;color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">🏦</span><b>SecureBank Online — Sign In</b></div>
+        <button id="phishClose" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:20px 22px;background:#f4f6fa;font-size:13px;color:#555;border-bottom:1px solid #ddd;">
+        ⚠ <b>Urgent:</b> we detected unusual activity. Please re-verify your credentials to keep your account active.
+      </div>
+      <div style="padding:22px;">
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:13px;color:#444;margin-bottom:5px;">Username</label>
+          <input id="phishUser" placeholder="your.email@bank.com" style="width:100%;padding:10px;border:1px solid #bbb;border-radius:6px;font-size:14px;">
+        </div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block;font-size:13px;color:#444;margin-bottom:5px;">Password</label>
+          <input id="phishPass" type="password" placeholder="••••••••" style="width:100%;padding:10px;border:1px solid #bbb;border-radius:6px;font-size:14px;">
+        </div>
+        <button id="phishLogin" style="width:100%;padding:11px;background:#1a3a8c;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:15px;font-weight:bold;">Sign In</button>
+        <div style="font-size:11px;color:#888;margin-top:14px;text-align:center;">securebank.com · TLS 1.3 · Verified by VeriSign</div>
+      </div>
+      <div id="phishReveal" style="display:none;background:#1a0a08;color:#ff8a6e;padding:22px;border-top:3px solid #ff6a3a;">
+        <h3 style="margin:0 0 10px 0;font-family:'Permanent Marker',cursive;font-size:20px;">🎣 YOU JUST GOT PHISHED.</h3>
+        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;">
+          That site looked like your bank. The URL was <code style="color:#ffe066;">securebank-login.example.com</code> — not the real <code>securebank.com</code>. Your credentials just went to <b>my server</b>.
+        </p>
+        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;margin-top:10px;"><b>Red flags you missed:</b></p>
+        <ul style="font-size:12px;color:#ffd2c0;line-height:1.7;padding-left:18px;">
+          <li>Urgent-sounding "unusual activity" tone</li>
+          <li>Look-alike domain (one extra word in the URL)</li>
+          <li>No 2FA or device-recognition step</li>
+          <li>Real banks never email you a one-click login link</li>
+        </ul>
+        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;margin-top:10px;">
+          <b>How I defend against this in real apps:</b> WebAuthn / passkeys (no shared password), email-link verification with anti-replay tokens, DMARC + SPF on the email side.
+        </p>
+        <button id="phishOk" style="margin-top:14px;padding:9px 18px;background:#ff6a3a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Got it — close</button>
+      </div>
+    `;
+    document.body.appendChild(m);
+    m.querySelector('#phishClose').addEventListener('click', () => m.remove());
+    m.querySelector('#phishLogin').addEventListener('click', () => {
+      m.querySelector('#phishReveal').style.display = 'block';
+    });
+    m.querySelector('#phishOk').addEventListener('click', () => m.remove());
+  } else {
+    m.style.display = 'block';
+  }
+}
 
 // ────────── MINIMAP (draw every ~100ms — checkpoints + car position) ──────────
 (function () {
@@ -567,7 +690,7 @@ window.addEventListener('imran:interact', () => {
 
   function colorForZone(key) {
     if (key === 'about')                 return '#5CE5FF';
-    if (key === 'projects')              return '#FF3E8A';
+    if (key === 'projects')              return '#FFB070';
     if (key === 'skills')                return '#8A3EFF';
     if (key === 'contact')               return '#FFE066';
     if (key && key.startsWith('social_'))return '#C1FF12';
@@ -636,7 +759,7 @@ window.addEventListener('imran:interact', () => {
       ctx.save();
       ctx.translate(cx, cyp);
       ctx.rotate(cy + Math.PI);   // visual: triangle points "forward" relative to driving dir
-      ctx.fillStyle = '#FF3E8A';
+      ctx.fillStyle = '#FFB070';
       ctx.strokeStyle = '#3E2418';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -762,20 +885,54 @@ window.addEventListener('imran:interact', () => {
   }, 1500);
 })();
 
-// ────────── VISITOR COUNTER (uses CountAPI free service) ──────────
+// ────────── VISITOR COUNTER (server-side via /api/visit) ──────────
 (function () {
   const el = document.getElementById('visitorCount');
   if (!el) return;
-  // CountAPI is a free no-auth counter. Bump and read in one call.
-  fetch('https://api.countapi.xyz/hit/imran-pasha-portfolio/visits')
+  // Get-or-create a stable UUID in localStorage. Same browser = same UUID forever
+  // (until they clear data or use Incognito). No PII collected, no IP logged.
+  let uuid = localStorage.getItem('imranUUID');
+  if (!uuid) {
+    uuid = 'v-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
+    localStorage.setItem('imranUUID', uuid);
+  }
+  window.__imranUUID = uuid;
+
+  // POST /api/visit on first page load. Server returns total + unique counts + isNew flag.
+  fetch('/api/visit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uuid }),
+  })
     .then((r) => r.json())
-    .then((d) => { el.textContent = (d && d.value) ? d.value.toLocaleString() : '—'; })
-    .catch(() => {
-      // Service unavailable — silent fallback to localStorage rough estimate
-      const n = parseInt(localStorage.getItem('imranVisits') || '0', 10) + 1;
-      localStorage.setItem('imranVisits', n);
-      el.textContent = n + ' (local)';
-    });
+    .then((d) => {
+      el.textContent = (d.total || 0).toLocaleString();
+      // Hand the data to the 3D Visitor Tower in world.js (when ready)
+      if (window.imranWorld && window.imranWorld.setVisitData) {
+        window.imranWorld.setVisitData(d);
+      } else {
+        // World not yet booted — retry once after a moment
+        setTimeout(() => {
+          if (window.imranWorld && window.imranWorld.setVisitData) {
+            window.imranWorld.setVisitData(d);
+          }
+        }, 800);
+      }
+    })
+    .catch(() => { el.textContent = '—'; });
+
+  // Refresh the count + guestbook every 30s so the tower reflects others' visits
+  setInterval(() => {
+    fetch('/api/visits/stats')
+      .then((r) => r.json())
+      .then((d) => {
+        el.textContent = (d.total || 0).toLocaleString();
+        if (window.imranWorld && window.imranWorld.setVisitData) {
+          window.imranWorld.setVisitData(d);
+        }
+      })
+      .catch(() => {});
+  }, 30_000);
 })();
 
 // ────────── REDUCE-MOTION MODE (auto-detected via OS preference) ──────────
