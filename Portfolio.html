@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="world.css?v=13"/>
+<link rel="stylesheet" href="world.css?v=18"/>
 </head>
 <body>
 
@@ -87,15 +87,30 @@
   </form>
 </div>
 
-<!-- HUD continued (these were originally inside .hud before my refactor) -->
-<div class="hud-rest" id="hudRest" style="display:none;">
-  <div class="mobile-ctrl">
-    <div class="joystick"><div class="nub"></div></div>
-    <div class="btn-group">
-      <button class="btn-reset">↺</button>
-      <button class="btn-jump">JUMP</button>
+<!-- Mobile controls — moved OUT of #hudRest so they're always visible on small screens (independent of game-start state) -->
+<div class="mobile-ctrl" id="mobileCtrl">
+  <div class="joystick"><div class="nub"></div></div>
+  <div class="btn-group">
+    <div class="btn-row">
+      <button class="btn-act" data-act="walk" title="walk / drive (M)">🚶</button>
+      <button class="btn-act btn-cam" data-act="camera" title="camera (C)">📷</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-act btn-cable" data-act="cable" title="cable car (T)">🚠</button>
+      <button class="btn-act btn-fly" data-act="fly" title="fly (L)">✈</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-act btn-reset" data-act="reset" title="reset (R)">↺</button>
+      <button class="btn-act btn-action" data-act="interact" title="interact (E)">E</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-act btn-jump" data-act="jump" title="run">⚡</button>
     </div>
   </div>
+</div>
+
+<!-- HUD continued (these were originally inside .hud before my refactor) -->
+<div class="hud-rest" id="hudRest" style="display:none;">
   <div class="toast" id="toast"></div>
   <!-- Cinematic intro overlay (shows during the 6-sec fly-over) -->
   <div class="cinematic-overlay" id="cinematicOverlay">
@@ -108,6 +123,19 @@
       <div class="cinematic-bar cinematic-bar-top"></div>
       <div class="cinematic-bar cinematic-bar-bot"></div>
     </div>
+  </div>
+  <!-- Cable car cabin window overlay (shows when in cable_ride mode) -->
+  <div class="cable-car-window" id="cableCarWindow">
+    <div class="ccw-frame ccw-top"></div>
+    <div class="ccw-frame ccw-bottom"></div>
+    <div class="ccw-frame ccw-left"></div>
+    <div class="ccw-frame ccw-right"></div>
+    <div class="ccw-corner ccw-corner-tl"></div>
+    <div class="ccw-corner ccw-corner-tr"></div>
+    <div class="ccw-corner ccw-corner-bl"></div>
+    <div class="ccw-corner ccw-corner-br"></div>
+    <div class="ccw-badge">🚠 CABLE CAR</div>
+    <div class="ccw-hint">press M to dismount</div>
   </div>
   <div class="minimap-wrap">
     <div class="minimap-label">CITY MAP · click a pin to jump</div>
@@ -161,20 +189,25 @@ const ld = setInterval(() => {
 }, 80);
 </script>
 
-<script src="world.js?v=48"></script>
+<script src="world.js?v=50"></script>
 
 <script>
 // Start handler
 const playBtn = document.getElementById('playBtn');
+const startEl = document.getElementById('start');
 const hud = document.getElementById('hud');
-playBtn.addEventListener('click', () => {
+function startGame() {
   if (window.imranSound) { window.imranSound.unlock(); window.imranSound.click(); }
-  start.classList.add('hidden');
+  startEl.classList.add('hidden');
   hud.style.display = 'block';
   document.getElementById('hudRest').style.display = 'block';   // mobile-ctrl, toast, minimap, cinematic
   window.__imranStartRequested = true;
   window.dispatchEvent(new Event('imran:start'));
-});
+}
+playBtn.addEventListener('click', startGame);
+// Tap anywhere on the start overlay to start (mobile UX — button can be hard to hit)
+startEl.addEventListener('click', startGame);
+startEl.addEventListener('touchend', (e) => { e.preventDefault(); startGame(); }, { passive: false });
 
 // Speed HUD
 const speedEl = document.getElementById('speed');
@@ -205,6 +238,15 @@ window.addEventListener('imran:cinematic:start', () => {
 });
 window.addEventListener('imran:cinematic:end', () => {
   cinematicOverlay.classList.remove('show');
+});
+
+// Cable car cabin window overlay (toggled when entering/exiting cable_ride mode)
+const cableCarWindow = document.getElementById('cableCarWindow');
+window.addEventListener('imran:cable_ride:start', () => {
+  if (cableCarWindow) cableCarWindow.classList.add('show');
+});
+window.addEventListener('imran:cable_ride:end', () => {
+  if (cableCarWindow) cableCarWindow.classList.remove('show');
 });
 
 // ────────── VOICE COMMANDS (Web Speech API) ──────────
@@ -533,6 +575,18 @@ function showPanel(z) {
     activeInteractUrl = '__phishing__';
     activeInteractLabel = 'Phishing Demo';
     showInteractPrompt(`🎣 <span class="pink">PHISHING DEMO</span> — press <kbd>E</kbd> to see how credentials get phished`);
+  } else if (z.key === 'port_scan_demo') {
+    activeInteractUrl = '__portscan__';
+    activeInteractLabel = 'Port Scan Demo';
+    showInteractPrompt(`🛬 <span class="pink">PORT SCAN DEMO</span> — press <kbd>E</kbd> to see what an attacker discovers`);
+  } else if (z.key === 'cloud_demo') {
+    activeInteractUrl = '__cloud__';
+    activeInteractLabel = 'Cloud Security Demo';
+    showInteractPrompt(`☁️ <span class="pink">CLOUD SECURITY</span> — press <kbd>E</kbd> to see how an S3 bucket leaks`);
+  } else if (z.key === 'vpn_demo') {
+    activeInteractUrl = '__vpn__';
+    activeInteractLabel = 'VPN / TLS Demo';
+    showInteractPrompt(`🔒 <span class="pink">VPN TUNNEL</span> — press <kbd>E</kbd> to see how the cable car explains TLS`);
   } else if (z.key === 'balloon_ride_pad') {
     showInteractPrompt(`🎈 <span class="pink">BALLOON RIDE</span> — press <kbd>E</kbd> to take off · <kbd>M</kbd> to land`);
   }
@@ -569,6 +623,18 @@ window.addEventListener('imran:interact', () => {
   }
   if (activeInteractUrl === '__phishing__') {
     showPhishingDemo();
+    return;
+  }
+  if (activeInteractUrl === '__portscan__') {
+    showPortScanDemo();
+    return;
+  }
+  if (activeInteractUrl === '__cloud__') {
+    showCloudDemo();
+    return;
+  }
+  if (activeInteractUrl === '__vpn__') {
+    showVpnDemo();
     return;
   }
   window.open(activeInteractUrl, '_blank');
@@ -669,6 +735,171 @@ function showPhishingDemo() {
       m.querySelector('#phishReveal').style.display = 'block';
     });
     m.querySelector('#phishOk').addEventListener('click', () => m.remove());
+  } else {
+    m.style.display = 'block';
+  }
+}
+
+// Port-scan demo — terminal-style nmap output simulating what an attacker discovers.
+function showPortScanDemo() {
+  let m = document.getElementById('portScanModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'portScanModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#0a0a14;border:2px solid #5ce5ff;border-radius:14px;padding:0;color:#5ce5ff;font-family:"JetBrains Mono",monospace;min-width:520px;max-width:92vw;box-shadow:0 0 60px rgba(92,229,255,0.4);overflow:hidden;';
+    m.innerHTML = `
+      <div style="background:#1a1428;color:#5ce5ff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2438;">
+        <div style="display:flex;align-items:center;gap:10px;font-size:14px;"><span style="font-size:18px;">🛬</span><b>nmap — what an attacker sees</b></div>
+        <button id="portScanClose" style="background:none;border:none;color:#5ce5ff;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:20px 22px;font-size:13px;line-height:1.65;">
+        <div style="color:#9ce6ff;margin-bottom:10px;">An airport has gates 1, 2, 3. A server has ports 22, 80, 443. <b>nmap</b> is how I check which gates have flights.</div>
+        <pre id="portScanOutput" style="background:#001019;border:1px solid #2a3848;padding:12px;border-radius:6px;color:#9ce6ff;font-size:12px;line-height:1.55;margin:0;overflow:auto;white-space:pre;">$ nmap -sV target.io
+Starting Nmap scan...</pre>
+        <button id="portScanReveal" style="margin-top:14px;padding:9px 18px;background:#5ce5ff;color:#001019;border:none;border-radius:6px;cursor:pointer;font-family:'Permanent Marker',cursive;font-size:14px;">show what's exposed →</button>
+        <div id="portScanResult" style="display:none;margin-top:14px;color:#ffd2c0;font-size:13px;line-height:1.65;">
+          <div style="color:#ff8a6e;font-weight:bold;font-size:16px;margin-bottom:8px;">⚠ Found 4 open ports — one of them shouldn't be public.</div>
+          <p>Port 8080 is the debug interface. If your server is reachable on 0.0.0.0, an attacker doesn't even need to guess — they just scan.</p>
+          <p style="margin-top:10px;color:#cfffaa;"><b>How I defend:</b></p>
+          <ul style="padding-left:18px;color:#cfffaa;line-height:1.7;font-size:12px;">
+            <li>Cloud security group: only 22/80/443 open to 0.0.0.0/0</li>
+            <li><code style="color:#ffe066;">fail2ban</code> bans IPs after failed SSH attempts</li>
+            <li>Admin endpoints require WireGuard / Tailscale (not public)</li>
+            <li>Caddy runs as the only public listener; backend on internal Docker network</li>
+          </ul>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(m);
+    m.querySelector('#portScanClose').addEventListener('click', () => m.remove());
+    // Animate the nmap output line by line
+    const out = m.querySelector('#portScanOutput');
+    const lines = [
+      '$ nmap -sV target.io',
+      'Starting Nmap scan...',
+      '',
+      'PORT      STATE  SERVICE     VERSION',
+      '22/tcp    open   ssh         OpenSSH 8.2',
+      '80/tcp    open   http        nginx 1.18',
+      '443/tcp   open   https       nginx 1.18',
+      '8080/tcp  open   http-proxy  ⚠ debug interface exposed',
+      '',
+      'Nmap done: 1 IP address (1 host up) scanned in 3.42 seconds',
+    ];
+    let i = 1;
+    const interval = setInterval(() => {
+      out.textContent = lines.slice(0, i + 1).join('\n');
+      i++;
+      if (i >= lines.length) clearInterval(interval);
+    }, 220);
+    m.querySelector('#portScanReveal').addEventListener('click', () => {
+      m.querySelector('#portScanResult').style.display = 'block';
+    });
+  } else {
+    m.style.display = 'block';
+  }
+}
+
+// Cloud security demo — fake AWS S3 bucket browser showing public files.
+function showCloudDemo() {
+  let m = document.getElementById('cloudModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'cloudModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#fff;border:2px solid #232f3e;border-radius:10px;padding:0;color:#232f3e;font-family:system-ui,sans-serif;min-width:480px;max-width:92vw;box-shadow:0 0 60px rgba(255,153,0,0.4);overflow:hidden;';
+    m.innerHTML = `
+      <div style="background:#232f3e;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:10px;"><span style="color:#ff9900;font-weight:bold;font-size:18px;">aws</span><b>S3 · imran-photos · public access</b></div>
+        <button id="cloudClose" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:6px 18px;background:#fff7e6;border-bottom:1px solid #f0c878;font-size:12px;color:#7a4a00;">
+        ⚠ Bucket policy: <code>Effect: Allow, Principal: *</code> — anyone with the URL can read every file.
+      </div>
+      <div style="padding:14px 18px;">
+        <div style="font-size:12px;color:#666;margin-bottom:6px;">s3://imran-photos/</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f4f6fa;color:#555;">
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #ddd;">Name</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #ddd;">Size</th>
+              <th style="padding:8px 10px;text-align:left;border-bottom:1px solid #ddd;">Access</th>
+            </tr>
+          </thead>
+          <tbody style="font-family:monospace;">
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 IDcard.pdf</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">2.1 MB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 passport.jpg</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">3.8 MB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 bank-statement.pdf</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">486 KB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 config-backup.tar.gz</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">14 MB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 .env.production</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">1.2 KB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+            <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 user-emails.csv</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">2.4 MB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
+          </tbody>
+        </table>
+        <button id="cloudReveal" style="margin-top:14px;padding:9px 18px;background:#ff9900;color:#000;border:none;border-radius:5px;cursor:pointer;font-weight:bold;font-size:13px;">how this happens →</button>
+        <div id="cloudResult" style="display:none;margin-top:14px;background:#1a0a08;color:#ffd2c0;padding:14px;border-radius:6px;font-size:13px;line-height:1.7;">
+          <div style="color:#ff8a6e;font-weight:bold;font-size:15px;margin-bottom:6px;">☁️ This is the most common cloud breach.</div>
+          <p>A developer makes a bucket public for testing, ships, forgets to lock it down. <code style="color:#ffe066;">git secrets</code> finds nothing because the leak isn't in code — it's in the cloud config.</p>
+          <p style="margin-top:8px;"><b>How I defend:</b></p>
+          <ul style="padding-left:18px;line-height:1.7;font-size:12px;">
+            <li>S3 Block Public Access at the account level — turns "public" into a fail-closed setting</li>
+            <li>Least-privilege IAM — buckets default-deny, services granted explicit GetObject only on needed prefixes</li>
+            <li>Presigned URLs with short TTL for actual public sharing</li>
+            <li>CloudTrail + automated alerts on bucket-policy changes</li>
+          </ul>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(m);
+    m.querySelector('#cloudClose').addEventListener('click', () => m.remove());
+    m.querySelector('#cloudReveal').addEventListener('click', () => {
+      m.querySelector('#cloudResult').style.display = 'block';
+    });
+  } else {
+    m.style.display = 'block';
+  }
+}
+
+// VPN / TLS demo — side-by-side without/with TLS to explain the cable car analogy.
+function showVpnDemo() {
+  let m = document.getElementById('vpnModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'vpnModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#0a1426;border:2px solid #5ce5ff;border-radius:14px;padding:0;color:#9ce6ff;font-family:system-ui,sans-serif;min-width:580px;max-width:94vw;box-shadow:0 0 60px rgba(92,229,255,0.4);overflow:hidden;';
+    m.innerHTML = `
+      <div style="background:#1a2438;color:#5ce5ff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a3458;">
+        <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:20px;">🔒</span><b>How the cable car explains TLS</b></div>
+        <button id="vpnClose" style="background:none;border:none;color:#5ce5ff;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:18px 22px;">
+        <p style="font-size:13px;line-height:1.65;color:#cfe6ff;margin-bottom:14px;">A cable car cabin moves along its own dedicated cable. No-one else can climb in mid-flight. That's exactly what TLS does for your traffic.</p>
+        <div style="display:flex;gap:14px;">
+          <div style="flex:1;background:#28140a;border:1px solid #6a3a1a;border-radius:8px;padding:12px;">
+            <div style="font-size:13px;color:#ff8a6e;font-weight:bold;margin-bottom:8px;">❌ HTTP — open road</div>
+            <div style="font-family:monospace;font-size:11px;line-height:1.5;color:#ffd2c0;">browser<br>&nbsp;&nbsp;↓<br>☕ coffee shop wifi<br>&nbsp;&nbsp;↓ <span style="color:#ff8a6e;">👀 eavesdropper reads it all</span><br>&nbsp;&nbsp;↓<br>server</div>
+            <div style="margin-top:8px;font-size:11px;color:#cfa090;">Password, session cookie, every request — readable.</div>
+          </div>
+          <div style="flex:1;background:#0a2418;border:1px solid #1a6a3a;border-radius:8px;padding:12px;">
+            <div style="font-size:13px;color:#9fef00;font-weight:bold;margin-bottom:8px;">✅ HTTPS — sealed cable</div>
+            <div style="font-family:monospace;font-size:11px;line-height:1.5;color:#cfffaa;">browser<br>&nbsp;&nbsp;↓<br>🔒 sealed TLS tunnel<br>&nbsp;&nbsp;↓ <span style="color:#9fef00;">eavesdropper sees encrypted bytes</span><br>&nbsp;&nbsp;↓<br>server</div>
+            <div style="margin-top:8px;font-size:11px;color:#90c090;">Encrypted + authenticated + integrity-checked.</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;font-size:12px;line-height:1.7;color:#9ce6ff;">
+          <b>What actually happens during the handshake:</b>
+          <ul style="padding-left:18px;margin-top:6px;color:#bcd6ee;">
+            <li>Server proves it's the real server with a certificate (signed by a trusted CA)</li>
+            <li>Both sides agree on a fresh symmetric key — never sent over the wire</li>
+            <li>Perfect-forward-secrecy: even if the long-term key leaks tomorrow, today's traffic stays safe</li>
+            <li>Every byte after that is encrypted + authenticated + tamper-evident</li>
+          </ul>
+        </div>
+        <p style="font-size:12px;color:#9ce6ff;margin-top:12px;line-height:1.6;">This site uses <b>Caddy</b> as the reverse proxy — it auto-fetches a Let's Encrypt cert and renews it. Zero config, no hand-rolled OpenSSL. That's why you see <code style="color:#ffe066;">https://</code> with no warning.</p>
+        <button id="vpnOk" style="margin-top:14px;padding:9px 18px;background:#5ce5ff;color:#0a1426;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">got it</button>
+      </div>
+    `;
+    document.body.appendChild(m);
+    m.querySelector('#vpnClose').addEventListener('click', () => m.remove());
+    m.querySelector('#vpnOk').addEventListener('click', () => m.remove());
   } else {
     m.style.display = 'block';
   }

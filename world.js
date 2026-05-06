@@ -2200,10 +2200,16 @@
       if (window.__imranToast) window.__imranToast('🎈 Taking off — 60s tour · press <kbd>M</kbd> to land early');
     } else {
       if (window.__imranToast) window.__imranToast('🚠 Cable car ride · press <kbd>M</kbd> to exit');
+      // Show the in-cabin window-frame overlay
+      window.dispatchEvent(new Event('imran:cable_ride:start'));
     }
   }
   function exitRideMode() {
     if (playerMode !== 'cable_ride' && playerMode !== 'balloon_ride') return;
+    // Hide the cable-car window overlay if we were in cable_ride
+    if (playerMode === 'cable_ride') {
+      window.dispatchEvent(new Event('imran:cable_ride:end'));
+    }
     // If we exit the balloon mid-tour, snap it back to its home pad
     if (playerMode === 'balloon_ride' && rideTarget && rideTarget.userData.rideTour) {
       const h = rideTarget.userData.rideTour;
@@ -2436,11 +2442,37 @@
   }
   const btnJump = document.querySelector('.btn-jump');
   if (btnJump) {
-    btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); touch.jump = true; }, { passive: false });
-    btnJump.addEventListener('touchend', () => { touch.jump = false; });
+    btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); touch.jump = true; keys.jump = true; }, { passive: false });
+    btnJump.addEventListener('touchend', () => { touch.jump = false; keys.jump = false; });
+    btnJump.addEventListener('mousedown', (e) => { e.preventDefault(); touch.jump = true; keys.jump = true; });
+    btnJump.addEventListener('mouseup', () => { touch.jump = false; keys.jump = false; });
   }
-  const btnReset = document.querySelector('.btn-reset');
-  if (btnReset) btnReset.addEventListener('touchstart', resetCar, { passive: true });
+  // Mobile action buttons — synthesize keyboard events so existing key handlers fire unchanged.
+  // Maps button data-act to KeyboardEvent.code. Tap = quick keydown+keyup.
+  const actToKey = {
+    interact: 'KeyE',
+    walk: 'KeyM',
+    cable: 'KeyT',
+    camera: 'KeyC',
+    fly: 'KeyL',
+    reset: 'KeyR',
+  };
+  function tapKey(code) {
+    const down = new KeyboardEvent('keydown', { code, bubbles: true });
+    window.dispatchEvent(down);
+    setTimeout(() => {
+      window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+    }, 80);
+  }
+  document.querySelectorAll('.btn-act[data-act]').forEach(btn => {
+    const act = btn.getAttribute('data-act');
+    if (act === 'jump') return;     // jump is handled separately above (hold-to-run, not tap)
+    const code = actToKey[act];
+    if (!code) return;
+    const handler = (e) => { e.preventDefault(); tapKey(code); };
+    btn.addEventListener('touchstart', handler, { passive: false });
+    btn.addEventListener('click', handler);
+  });
 
   // ─────────────── CAR DRIVING ───────────────
   let yaw = 0;
@@ -3275,6 +3307,22 @@
   rampSign.scale.set(0.5, 0.5, 0.5);
   rampSign.userData.noBillboard = true;
   scene.add(rampSign);
+  // VPN-tunnel demo signpost — sealed gondola on a wire = TLS encrypted transport
+  const vpnDemoPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  vpnDemoPost.position.set(STATION_X + 4, 1.75, stairBottomZ + 1);
+  scene.add(vpnDemoPost);
+  const vpnDemoSign = makeLabel('🔒 VPN TUNNEL — press E', '#5ce5ff', 70);
+  vpnDemoSign.position.set(STATION_X + 4, 3.5, stairBottomZ + 1);
+  vpnDemoSign.scale.set(0.6, 0.6, 0.6);
+  vpnDemoSign.userData.noBillboard = true;
+  scene.add(vpnDemoSign);
+  zones.push({
+    x: STATION_X, z: STATION_Z, radius: 18, key: 'vpn_demo',
+    label: 'VPN TUNNEL', ring: null, lab: vpnDemoSign
+  });
   // Turn-off signpost on Pasha Boulevard (z=0, x=42 — at NS-42E intersection with EW-0)
   // Tells the player driving east on the boulevard to turn left for the cable car
   const turnSignPost = new THREE.Mesh(
@@ -3587,6 +3635,23 @@
   aptSign.scale.set(0.7, 0.7, 0.7);
   aptSign.userData.noBillboard = true;
   scene.add(aptSign);
+
+  // Port-scan demo signpost — flights/gates metaphor for nmap port discovery
+  const aptDemoPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  aptDemoPost.position.set(APT_X + 14, 1.75, APT_Z - 30);
+  scene.add(aptDemoPost);
+  const aptDemoSign = makeLabel('🛬 PORT SCAN DEMO — press E', '#5ce5ff', 70);
+  aptDemoSign.position.set(APT_X + 14, 3.5, APT_Z - 30);
+  aptDemoSign.scale.set(0.6, 0.6, 0.6);
+  aptDemoSign.userData.noBillboard = true;
+  scene.add(aptDemoSign);
+  zones.push({
+    x: APT_X, z: APT_Z, radius: 30, key: 'port_scan_demo',
+    label: 'PORT SCAN DEMO', ring: null, lab: aptDemoSign
+  });
 
   // Two animated planes that loop takeoff/landing along the runway (-X to +X)
   function makePlane(color = 0xffffff) {
@@ -3936,6 +4001,22 @@
   balSign.scale.set(0.6, 0.6, 0.6);
   balSign.userData.noBillboard = true;
   scene.add(balSign);
+  // Cloud-security demo signpost — balloons float in clouds → S3 misconfig analogy
+  const balDemoPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 3.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  balDemoPost.position.set(BAL_X - 18, 1.75, BAL_Z + 10);
+  scene.add(balDemoPost);
+  const balDemoSign = makeLabel('☁ CLOUD SECURITY — press E', '#5ce5ff', 70);
+  balDemoSign.position.set(BAL_X - 18, 3.5, BAL_Z + 10);
+  balDemoSign.scale.set(0.6, 0.6, 0.6);
+  balDemoSign.userData.noBillboard = true;
+  scene.add(balDemoSign);
+  zones.push({
+    x: BAL_X, z: BAL_Z, radius: 22, key: 'cloud_demo',
+    label: 'CLOUD SECURITY', ring: null, lab: balDemoSign
+  });
   // Helper to build one balloon
   function makeBalloon(color, basketColor = 0x6e4a28) {
     const g = new THREE.Group();

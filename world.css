@@ -13,7 +13,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #FFB070; c
 .loader .pct { margin-top: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: .3em; color: rgba(62, 36, 24, 0.55); }
 
 /* Start screen */
-.start { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; padding: 24px; pointer-events: none; }
+.start { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; padding: 24px; cursor: pointer; }
 .start.hidden { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .6s, visibility .6s; }
 .start .scribble { font-family: 'Permanent Marker', cursive; font-size: clamp(40px, 7vw, 96px); color: #fff; text-shadow: 0 4px 12px rgba(122,74,40,0.5); line-height: 1; }
 .start .scribble .pink { color: #ffb070; }
@@ -45,18 +45,57 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #FFB070; c
 .toolbar button.active { background: #FFB070; color: #fff; border-color: #FFB070; box-shadow: 0 4px 0 #A55A28; }
 
 /* Mobile controls */
-.mobile-ctrl { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px; display: none; justify-content: space-between; align-items: flex-end; pointer-events: none; }
+.mobile-ctrl { position: fixed; bottom: 0; left: 0; right: 0; padding: 14px; display: none; justify-content: space-between; align-items: flex-end; pointer-events: none; z-index: 95; }
 .mobile-ctrl > * { pointer-events: auto; }
-.joystick { width: 140px; height: 140px; border-radius: 50%; background: rgba(255, 247, 235, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(122, 74, 40, 0.4); position: relative; touch-action: none; }
-.joystick .nub { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255,176,112,.7); border: 1px solid rgba(255,255,255,.3); }
-.btn-group { display: flex; flex-direction: column; gap: 8px; }
-.btn-group button { width: 70px; height: 70px; border-radius: 50%; border: 1px solid rgba(122, 74, 40, 0.4); background: rgba(255, 247, 235, 0.6); backdrop-filter: blur(10px); color: #3E2418; font-family: 'Permanent Marker', cursive; font-size: 13px; cursor: pointer; }
-.btn-jump { background: rgba(92,229,255,.4) !important; }
-.btn-reset { background: rgba(255,224,102,.4) !important; }
+.joystick { width: 130px; height: 130px; border-radius: 50%; background: rgba(255, 247, 235, 0.55); backdrop-filter: blur(10px); border: 1px solid rgba(122, 74, 40, 0.4); position: relative; touch-action: none; }
+.joystick .nub { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(255,176,112,.75); border: 2px solid rgba(255,255,255,.6); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.btn-group { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.btn-row { display: flex; gap: 8px; }
+.btn-act {
+  width: 56px; height: 56px; border-radius: 50%;
+  border: 2px solid rgba(122, 74, 40, 0.5);
+  background: rgba(255, 247, 235, 0.7);
+  backdrop-filter: blur(10px);
+  color: #3E2418; font-family: 'Permanent Marker', cursive; font-size: 22px;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.btn-act:active { transform: scale(0.92); background: rgba(255, 224, 102, 0.85); }
+.btn-action { background: rgba(255,138,110,.55) !important; font-size: 18px; }
+.btn-jump { background: rgba(92,229,255,.55) !important; font-size: 22px; }
+.btn-reset { background: rgba(255,224,102,.55) !important; font-size: 22px; }
+.btn-cable { background: rgba(159,239,0,.45) !important; }
+.btn-cam { background: rgba(255,200,160,.55) !important; }
+.btn-fly { background: rgba(180,140,255,.5) !important; }
+
 @media (max-width: 768px), (pointer: coarse) {
   .mobile-ctrl { display: flex; }
   .controls-card { display: none; }
-  .speedo .num { font-size: 36px; }
+  .speedo .num { font-size: 30px; }
+  .speedo { padding: 8px 14px !important; }
+  .visit-counter { font-size: 11px !important; padding: 6px 10px !important; }
+  .minimap-wrap { width: 90px !important; height: 90px !important; right: 8px !important; top: 8px !important; }
+  .minimap-wrap canvas { width: 90px !important; height: 90px !important; }
+  /* Hide the desktop right-side button stack — its functions live in the mobile button grid */
+  .hud-tr { display: none !important; }
+  /* Modals fit small screens */
+  .zone-panel { max-height: 80vh; overflow-y: auto; padding: 18px 20px; }
+  /* Reposition bottom-left so it doesn't overlap the joystick */
+  .visit-counter { bottom: 165px !important; left: 10px !important; font-size: 11px !important; padding: 5px 9px !important; }
+  .online-counter { bottom: 145px !important; left: 10px !important; font-size: 11px !important; padding: 5px 9px !important; }
+  /* Move chat fab to top-left so it's away from joystick + buttons */
+  .chat-fab { font-size: 12px !important; padding: 6px 10px !important; bottom: auto !important; top: 60px !important; left: 8px !important; }
+  /* Hide nitro-boost banner — too much chatter on small screen */
+  #nitroBanner { font-size: 11px !important; padding: 5px 10px !important; bottom: auto !important; top: 8px !important; }
+}
+@media (max-width: 480px) {
+  .joystick { width: 110px; height: 110px; }
+  .joystick .nub { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+  .btn-act { width: 48px; height: 48px; font-size: 18px; }
+  .btn-action { font-size: 15px; }
+  .mobile-ctrl { padding: 10px; }
 }
 
 /* Info panel (zone) */
@@ -359,4 +398,54 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 @media (max-width: 768px) {
   .chat-fab { bottom: 16px; left: 16px; font-size: 14px; padding: 10px 16px; }
   .chat-modal { right: 8px; bottom: 8px; left: 8px; width: auto; height: 70vh; }
+}
+
+/* ───────── Cable car cabin window overlay (shown during cable_ride mode) ───────── */
+.cable-car-window {
+  position: fixed; inset: 0; z-index: 90; pointer-events: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+  animation: ccw-sway 4s ease-in-out infinite;
+}
+.cable-car-window.show { opacity: 1; visibility: visible; }
+@keyframes ccw-sway {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(0, -1px); }
+  75% { transform: translate(2px, 1px); }
+}
+/* Frame (cabin body) — dark gradient panels around the edges */
+.ccw-frame {
+  position: absolute;
+  background: linear-gradient(rgba(8, 12, 24, 0.92), rgba(20, 28, 50, 0.78));
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+}
+.ccw-top    { top: 0; left: 0; right: 0; height: 12vh;
+  background: linear-gradient(to bottom, rgba(8, 12, 24, 0.98), rgba(20, 28, 50, 0.4)); }
+.ccw-bottom { bottom: 0; left: 0; right: 0; height: 18vh;
+  background: linear-gradient(to top, rgba(8, 12, 24, 0.98), rgba(20, 28, 50, 0.3)); }
+.ccw-left   { top: 0; bottom: 0; left: 0; width: 8vw;
+  background: linear-gradient(to right, rgba(8, 12, 24, 0.95), rgba(20, 28, 50, 0.0)); }
+.ccw-right  { top: 0; bottom: 0; right: 0; width: 8vw;
+  background: linear-gradient(to left, rgba(8, 12, 24, 0.95), rgba(20, 28, 50, 0.0)); }
+/* Window corner frames — darker triangular shadows so the rectangular "window" pops */
+.ccw-corner {
+  position: absolute; width: 14vw; height: 12vh;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 0%, rgba(8, 12, 24, 0.85) 75%);
+}
+.ccw-corner-tl { top: 0; left: 0; }
+.ccw-corner-tr { top: 0; right: 0; }
+.ccw-corner-bl { bottom: 0; left: 0; }
+.ccw-corner-br { bottom: 0; right: 0; }
+/* Branding badge top-left + dismount hint top-right */
+.ccw-badge {
+  position: absolute; top: 18px; left: 22px;
+  font-family: "Permanent Marker", cursive; font-size: 18px;
+  color: #5ce5ff; text-shadow: 0 0 8px rgba(92, 229, 255, 0.6);
+  letter-spacing: 1px;
+}
+.ccw-hint {
+  position: absolute; top: 22px; right: 26px;
+  font-family: "JetBrains Mono", monospace; font-size: 12px;
+  color: #9ce6ff; opacity: 0.75;
 }
