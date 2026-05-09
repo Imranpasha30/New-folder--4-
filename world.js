@@ -313,9 +313,11 @@
   const ground = new THREE.Mesh(groundGeo, groundMatT);
   ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 
-  // Gridlines — keep Tron-purple grid as cybersecurity flag, soften for warm ground
-  const grid = new THREE.GridHelper(700, 140, 0x8a3eff, 0xc49ee6);
-  grid.material.transparent = true; grid.material.opacity = 0.28;
+  // Gridlines — muted, low-contrast so camera rotation isn't eye-straining.
+  // Was: bright purple (0x8a3eff) on lavender (0xc49ee6) at 0.28 opacity (+ 8Hz pulse).
+  // Now: dark slate on dark slate at 0.10 opacity, pulse disabled below.
+  const grid = new THREE.GridHelper(700, 140, 0x4a5060, 0x3a3848);
+  grid.material.transparent = true; grid.material.opacity = 0.10;
   grid.position.y = 0.01;
   scene.add(grid);
 
@@ -5916,11 +5918,8 @@
       // Pulse rings
       const t = clock.getElapsedTime();
 
-      // Pulse the grid
-      if (grid && grid.material) {
-         const pulseBeat = Math.max(0, Math.sin(t * 8));
-         grid.material.opacity = 0.28 + pulseBeat * 0.4;
-      }
+      // Grid stays at its initial low-contrast opacity (0.10) — no pulse.
+      // Removed because the 8Hz strobe was eye-straining when the camera rotates.
       spawnRing.material.opacity = 0.5 + Math.sin(t * 2) * 0.25;
       zones.forEach(z => { if (z.ring) { z.ring.material.opacity = 0.5 + Math.sin(t * 2 + z.x) * 0.3; } if (z.torus) { z.torus.rotation.y = t * 1.5; z.torus.position.y = 4 + Math.sin(t * 2 + z.x) * 0.4; } });
       // Sun spin
