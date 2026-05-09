@@ -1479,28 +1479,30 @@
   }
 
   // Scatter trees, avoiding zones and roads
+  // Tree positions — STRICT perimeter-only layout.
+  // Every position is ≥6m from every road centerline (= ≥3.5m from any road edge after canopy).
+  // No inner-block trees — all decoration lives outside the ±50 road grid (or in the park).
+  // Roads NS x ∈ {-77,-42,-32,-22,-12,0,12,22,32,42} and EW z ∈ {-50,-32,-22,-17.5,-12,-10,0,12,22,32,38,50,60,65}
   const TREE_SPOTS = [
-    // Park trees (cherry blossom cluster)
-    [parkX - 6, parkZ - 2, 'cherry'], [parkX - 3, parkZ - 8, 'cherry'],
-    [parkX + 6, parkZ + 2, 'oak'], [parkX + 4, parkZ + 8, 'pine'],
-    // Around the about zone
-    [-32, -16, 'pine'], [-28, -4, 'oak'],
-    // Behind projects
-    [-22, 32, 'cherry'], [-8, 32, 'oak'], [8, 32, 'pine'], [22, 32, 'cherry'],
-    // Around skills
-    [32, -10, 'pine'], [32, -22, 'oak'], [16, -28, 'cherry'],
-    // Around socials
-    [-32, 44, 'oak'], [22, 44, 'pine'],
-    // Around contact mailbox
-    [-8, -34, 'cherry'], [10, -34, 'oak'],
-    // Random fillers
-    [-44, 8, 'pine'], [-44, 24, 'oak'], [-44, -10, 'cherry'],
-    [44, 8, 'oak'], [44, 24, 'pine'], [44, -28, 'cherry'],
-    [-12, -44, 'pine'], [12, -44, 'oak'], [0, -44, 'cherry'],
-    [-32, 48, 'pine'], [0, 48, 'cherry'], [12, 48, 'oak'],
-    // Alpine Village forest backdrop (around cable car station + chalets)
-    [45, 35, 'pine'], [55, 45, 'pine'], [70, 50, 'pine'], [85, 55, 'pine'], [75, 70, 'pine'],
-    [55, 25, 'pine'], [88, 40, 'pine'], [48, 60, 'pine'],
+    // Park cluster — around parkX=-65, parkZ=-55. All ≥6m from z=-50 EW-50S road and ≥6m from x=-77 NS road.
+    [parkX - 6, parkZ - 6, 'cherry'], [parkX - 3, parkZ - 12, 'cherry'],
+    [parkX - 4, parkZ - 18, 'oak'], [parkX + 8, parkZ - 12, 'pine'], [parkX - 12, parkZ - 6, 'pine'],
+    // West perimeter (outside x=-42 road)
+    [-55, -60, 'pine'], [-55, 75, 'oak'], [-65, 78, 'pine'],
+    [-85, -60, 'pine'], [-85, 0, 'oak'], [-85, 80, 'pine'],
+    [-90, -25, 'pine'], [-90, 25, 'oak'], [-90, 90, 'pine'],
+    // East perimeter (outside x=42 road)
+    [55, -60, 'pine'], [85, -60, 'oak'], [90, -25, 'pine'],
+    [85, 0, 'cherry'], [90, 25, 'pine'],
+    // Alpine Village (NE — beyond Tower Approach z=50 + Recreation Lane z=60, so use z≥75)
+    [55, 75, 'pine'], [65, 80, 'pine'], [75, 75, 'pine'], [85, 80, 'pine'], [90, 85, 'pine'],
+    // South perimeter (z≤-75, well outside EW-50S road extent)
+    [-45, -75, 'pine'], [-25, -80, 'oak'], [-7, -80, 'cherry'],
+    [7, -80, 'oak'], [25, -80, 'pine'], [45, -75, 'pine'],
+    // North perimeter (z≥80, outside the new outer roads)
+    [-50, 80, 'oak'], [-25, 85, 'pine'], [25, 85, 'cherry'], [50, 85, 'oak'],
+    // Far corners
+    [-90, -90, 'pine'], [90, -90, 'pine'], [90, 90, 'pine'],
   ];
   for (const [x, z, t] of TREE_SPOTS) addTree(x, z, t);
 
@@ -1578,11 +1580,12 @@
     }
     trafficLights.push({ lights, state: Math.floor(Math.random()*3), t: Math.random()*4 });
   }
-  // Place at 4 main intersections
-  addTrafficLight(-11, -11);
-  addTrafficLight(11, -11);
-  addTrafficLight(-11, 11);
-  addTrafficLight(11, 11);
+  // Place at 4 main intersection CORNERS — pushed to ±17 so the post sits well off both road edges.
+  // (Roads are 5m wide centered on x=±12 / z=±12, so edges are at ±14.5; a post at ±17 sits 2.5m off.)
+  addTrafficLight(-17, -17);
+  addTrafficLight(17, -17);
+  addTrafficLight(-17, 17);
+  addTrafficLight(17, 17);
 
   // ─────────────── PARKED DECORATIVE CARS ───────────────
   function addParkedCar(x, z, rotY, color) {
