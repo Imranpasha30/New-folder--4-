@@ -319,6 +319,10 @@
   grid.position.y = 0.01;
   scene.add(grid);
 
+  // Custom pulse logic for grid
+  const gridPulseColor = new THREE.Color(0xc1ff12);
+  const gridOriginalColor = new THREE.Color(0xc49ee6);
+
   // X markers as little glowing pluses
   const markerGroup = new THREE.Group();
   const markerMat = new THREE.MeshBasicMaterial({ color: COL.pink });
@@ -1612,7 +1616,10 @@
       body.addEventListener('collide', (ev) => {
         const imp = ev.contact && ev.contact.getImpactVelocityAlongNormal
           ? Math.abs(ev.contact.getImpactVelocityAlongNormal()) : 4;
-        if (imp > 2.5) Sound.crash(imp);
+        if (imp > 2.5) {
+          Sound.crash(imp);
+          emitSparks(body.position.x, body.position.y, body.position.z, 10 + imp * 2, Math.min(1, imp / 10));
+        }
       });
     }
     objects.push({ mesh, body });
@@ -2038,6 +2045,142 @@
   }
   scene.add(carGroup);
 
+
+  // ─────────────── SPARK PARTICLES (collision impact) ───────────────
+  const SPARK_MAX = 300;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPos = new Float32Array(SPARK_MAX * 3);
+  const sparkVel = new Float32Array(SPARK_MAX * 3);
+  const sparkLives = new Float32Array(SPARK_MAX);
+  for (let i = 0; i < SPARK_MAX; i++) sparkPos[i*3 + 1] = -1000;
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  const sparkMat = new THREE.PointsMaterial({
+    color: 0xffb070, size: 0.8, sizeAttenuation: true,
+    transparent: true, opacity: 1.0, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const sparks = new THREE.Points(sparkGeo, sparkMat);
+  scene.add(sparks);
+  let sparkCursor = 0;
+  function emitSparks(x, y, z, count = 15, intensity = 1.0) {
+    for (let j = 0; j < count; j++) {
+      const i = sparkCursor;
+      sparkCursor = (sparkCursor + 1) % SPARK_MAX;
+      sparkPos[i*3 + 0] = x;
+      sparkPos[i*3 + 1] = y;
+      sparkPos[i*3 + 2] = z;
+      sparkVel[i*3 + 0] = (Math.random() - 0.5) * 15 * intensity;
+      sparkVel[i*3 + 1] = (2 + Math.random() * 8) * intensity;
+      sparkVel[i*3 + 2] = (Math.random() - 0.5) * 15 * intensity;
+      sparkLives[i] = 0.3 + Math.random() * 0.5;
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
+  }
+  function updateSparks(dt) {
+    let dirty = false;
+    for (let i = 0; i < SPARK_MAX; i++) {
+      if (sparkLives[i] > 0) {
+        sparkLives[i] -= dt;
+        sparkPos[i*3 + 0] += sparkVel[i*3 + 0] * dt;
+        sparkPos[i*3 + 1] += sparkVel[i*3 + 1] * dt;
+        sparkPos[i*3 + 2] += sparkVel[i*3 + 2] * dt;
+        sparkVel[i*3 + 1] -= 20 * dt; // gravity
+        if (sparkLives[i] <= 0) sparkPos[i*3 + 1] = -1000;
+        dirty = true;
+      }
+    }
+    if (dirty) sparkGeo.attributes.position.needsUpdate = true;
+  }
+
+
+  // ─────────────── NEON CAR TRAIL ───────────────
+  const CAR_TRAIL_MAX = 100;
+  const carTrailGeo = new THREE.BufferGeometry();
+  const carTrailPos = new Float32Array(CAR_TRAIL_MAX * 3);
+  const carTrailLives = new Float32Array(CAR_TRAIL_MAX);
+  for (let i = 0; i < CAR_TRAIL_MAX; i++) carTrailPos[i*3 + 1] = -1000;
+  carTrailGeo.setAttribute('position', new THREE.BufferAttribute(carTrailPos, 3));
+  const carTrailMat = new THREE.LineBasicMaterial({
+    color: 0x5ce5ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, linewidth: 2,
+  });
+  // Use Line instead of points, but we need connected segments.
+  // Actually, Line works best if vertices are ordered, but ring buffer breaks that.
+  // Instead of a single line, we can just use Points for a glowing dotted trail,
+  // OR a custom thick line. Let's use Points for simplicity, but large glowing ones.
+  const carTrailPointsMat = new THREE.PointsMaterial({
+    color: 0x5ce5ff, size: 1.5, sizeAttenuation: true,
+    transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const carTrail = new THREE.Points(carTrailGeo, carTrailPointsMat);
+  scene.add(carTrail);
+  let carTrailCursor = 0;
+  let lastTrailTime = 0;
+  function updateCarTrail(dt, t) {
+    if (t - lastTrailTime > 0.05) { // emit every 50ms
+      const i = carTrailCursor;
+      carTrailCursor = (carTrailCursor + 1) % CAR_TRAIL_MAX;
+      const cp = carGroup.position;
+      carTrailPos[i*3 + 0] = cp.x;
+      carTrailPos[i*3 + 1] = cp.y;
+      carTrailPos[i*3 + 2] = cp.z;
+      carTrailLives[i] = 1.0; // 1 second life
+      lastTrailTime = t;
+    }
+
+    let dirty = false;
+    for (let i = 0; i < CAR_TRAIL_MAX; i++) {
+      if (carTrailLives[i] > 0) {
+        carTrailLives[i] -= dt;
+        if (carTrailLives[i] <= 0) carTrailPos[i*3 + 1] = -1000;
+        dirty = true;
+      }
+    }
+    if (dirty) carTrailGeo.attributes.position.needsUpdate = true;
+
+    // Animate opacity or color based on nitro
+    if (nitroActive) {
+      carTrailPointsMat.color.setHex(0xffb070); // change color to orange/pink
+      carTrailPointsMat.size = 2.5;
+    } else {
+      carTrailPointsMat.color.setHex(0x5ce5ff);
+      carTrailPointsMat.size = 1.5;
+    }
+  }
+
+  // ─────────────── HOVER THRUST PARTICLES (plane mode) ───────────────
+  const THRUST_MAX = 200;
+  const thrustGeo = new THREE.BufferGeometry();
+  const thrustPos = new Float32Array(THRUST_MAX * 3);
+  const thrustLives = new Float32Array(THRUST_MAX);
+  for (let i = 0; i < THRUST_MAX; i++) thrustPos[i*3 + 1] = -1000;
+  thrustGeo.setAttribute('position', new THREE.BufferAttribute(thrustPos, 3));
+  const thrustMat = new THREE.PointsMaterial({
+    color: 0x5ce5ff, size: 1.2, sizeAttenuation: true,
+    transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const thrust = new THREE.Points(thrustGeo, thrustMat);
+  scene.add(thrust);
+  let thrustCursor = 0;
+  function emitThrust(x, y, z) {
+    const i = thrustCursor;
+    thrustCursor = (thrustCursor + 1) % THRUST_MAX;
+    thrustPos[i*3 + 0] = x + (Math.random() - 0.5) * 0.4;
+    thrustPos[i*3 + 1] = y - 0.5; // emit downwards
+    thrustPos[i*3 + 2] = z + (Math.random() - 0.5) * 0.4;
+    thrustLives[i] = 0.2 + Math.random() * 0.3;
+  }
+  function updateThrust(dt) {
+    let dirty = false;
+    for (let i = 0; i < THRUST_MAX; i++) {
+      if (thrustLives[i] > 0) {
+        thrustLives[i] -= dt;
+        thrustPos[i*3 + 1] -= 5 * dt; // push down
+        if (thrustLives[i] <= 0) thrustPos[i*3 + 1] = -1000;
+        dirty = true;
+      }
+    }
+    if (dirty) thrustGeo.attributes.position.needsUpdate = true;
+  }
+
   // ─────────────── DUST PARTICLES (behind rear wheels) ───────────────
   const DUST_MAX = 200;
   const dustGeo = new THREE.BufferGeometry();
@@ -2097,7 +2240,18 @@
   // CRITICAL: cannon.js 0.6.2 silently ignores applyForce() on sleeping bodies.
   // The chassis would fall to rest, sleep, and never accept driving forces again.
   chassis.allowSleep = false;
+
+  chassis.addEventListener('collide', (ev) => {
+    const imp = ev.contact && ev.contact.getImpactVelocityAlongNormal
+      ? Math.abs(ev.contact.getImpactVelocityAlongNormal()) : 4;
+    if (imp > 2.5) {
+      Sound.crash(imp);
+      // Emit sparks near the contact point, or just use chassis position
+      emitSparks(chassis.position.x, chassis.position.y - 0.5, chassis.position.z, 15 + imp * 2, Math.min(1, imp / 10));
+    }
+  });
   world.addBody(chassis);
+
 
   // ─────────────── INPUT ───────────────
   const keys = { f: false, b: false, l: false, r: false, jump: false };
@@ -2561,6 +2715,15 @@
     // Animate wings up
     wingScale = Math.min(1, wingScale + dt * 4);
     wings.scale.set(wingScale, wingScale, wingScale);
+
+    // DeLorean wheel tilt in fly mode
+    const targetZRot = Math.PI / 2;
+    for (const w of wheelMeshes) {
+       if (w.userData.tilt === undefined) w.userData.tilt = 0;
+       w.userData.tilt += (targetZRot - w.userData.tilt) * dt * 5;
+       w.rotation.z = w.userData.tilt;
+    }
+
     // Sync mesh
     carGroup.position.copy(chassis.position);
     carGroup.quaternion.copy(chassis.quaternion);
@@ -2742,6 +2905,24 @@
     // Sync mesh
     carGroup.position.copy(chassis.position);
     carGroup.quaternion.copy(chassis.quaternion);
+    // DeLorean wheel tilt in fly mode
+    const targetZRot = flyMode ? Math.PI / 2 : 0;
+
+    for (const w of wheelMeshes) {
+       if (w.userData.tilt === undefined) w.userData.tilt = 0;
+       w.userData.tilt += (targetZRot - w.userData.tilt) * dt * 5;
+
+       // w is added to carGroup, default rotation is math.PI/2 on Z from creation
+       // when tilted, they should lie flat.
+       // Original: w.rotation.z was Math.PI/2 but we didn't set it explicitly on w,
+       // wait, wheelGeo is rotated: wheelGeo.rotateZ(Math.PI/2).
+       // So the mesh w has rotation (0,0,0) normally.
+       // If we want it to lie flat (DeLorean style), we need to rotate it around X or Z?
+       // The wheel axis is X because it rolls around X.
+       // So to make it flat, we rotate around Z by Math.PI/2.
+       w.rotation.z = w.userData.tilt;
+    }
+
     // Spin wheels
     const wheelSpin = (speed * dt) / 0.6;
     for (const w of wheelMeshes) w.rotation.x -= wheelSpin;
@@ -5189,7 +5370,10 @@
     body.addEventListener('collide', (ev) => {
       const imp = ev.contact && ev.contact.getImpactVelocityAlongNormal
         ? Math.abs(ev.contact.getImpactVelocityAlongNormal()) : 4;
-      if (imp > 2.5) Sound.crash(imp);
+      if (imp > 2.5) {
+        Sound.crash(imp);
+        emitSparks(body.position.x, body.position.y, body.position.z, 10 + imp * 2, Math.min(1, imp / 10));
+      }
     });
     world.addBody(body);
     objects.push({ mesh, body, lab, labYOffset: 0 });
@@ -5655,7 +5839,16 @@
   function tick() {
     requestAnimationFrame(tick);
     try {
-      const dt = Math.min(clock.getDelta(), 1/30);
+      let rawDt = Math.min(clock.getDelta(), 1/30);
+      let timeScale = 1.0;
+
+      // Matrix-style slow motion when jumping high
+      if (chassis && chassis.position.y > 6 && !flyMode && playerMode === 'car') {
+         timeScale = 0.3; // 30% speed
+      }
+
+      const dt = rawDt * timeScale;
+      // also scale Cannon world step?
       if (started) {
         let drv;
         if (playerMode === 'walk') {
@@ -5684,8 +5877,20 @@
             emitDust(wp.x, 0.2, wp.z);
           }
         }
+        if (flyMode && useBloom) {
+           const wp = new THREE.Vector3();
+           for (const i of [0, 1, 2, 3]) { // all 4 wheels
+             wheelMeshes[i].getWorldPosition(wp);
+             emitThrust(wp.x, wp.y, wp.z);
+           }
+        }
         updateDust(dt);
-        world.step(1/60, dt, 3);
+        updateSparks(dt);
+        updateThrust(dt);
+        // Move t declaration up or calculate it here
+        const currentTime = clock.getElapsedTime();
+        updateCarTrail(dt, currentTime);
+        world.step(1/60, rawDt * timeScale, 3);
         // Sync dynamic objects
         for (const o of objects) {
           o.mesh.position.copy(o.body.position);
@@ -5698,7 +5903,7 @@
         window.dispatchEvent(new CustomEvent('imran:speed', { detail: Math.hypot(chassis.velocity.x, chassis.velocity.z) }));
         checkZones();
       } else {
-        world.step(1/60, dt, 3);
+        world.step(1/60, rawDt * timeScale, 3);
         for (const o of objects) {
           o.mesh.position.copy(o.body.position);
           o.mesh.quaternion.copy(o.body.quaternion);
@@ -5710,6 +5915,12 @@
       billboardLabels.forEach(l => l.lookAt(camera.position));
       // Pulse rings
       const t = clock.getElapsedTime();
+
+      // Pulse the grid
+      if (grid && grid.material) {
+         const pulseBeat = Math.max(0, Math.sin(t * 8));
+         grid.material.opacity = 0.28 + pulseBeat * 0.4;
+      }
       spawnRing.material.opacity = 0.5 + Math.sin(t * 2) * 0.25;
       zones.forEach(z => { if (z.ring) { z.ring.material.opacity = 0.5 + Math.sin(t * 2 + z.x) * 0.3; } if (z.torus) { z.torus.rotation.y = t * 1.5; z.torus.position.y = 4 + Math.sin(t * 2 + z.x) * 0.4; } });
       // Sun spin

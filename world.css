@@ -449,3 +449,27 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
   font-family: "JetBrains Mono", monospace; font-size: 12px;
   color: #9ce6ff; opacity: 0.75;
 }
+
+/* ───────── CRT Scanline Effect (Cyberpunk aesthetic overlay) ───────── */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.08) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.15) 100%);
+  z-index: 1001;
+  pointer-events: none;
+}
