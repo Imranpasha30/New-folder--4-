@@ -319,10 +319,6 @@
   grid.position.y = 0.01;
   scene.add(grid);
 
-  // Custom pulse logic for grid
-  const gridPulseColor = new THREE.Color(0xc1ff12);
-  const gridOriginalColor = new THREE.Color(0xc49ee6);
-
   // X markers as little glowing pluses
   const markerGroup = new THREE.Group();
   const markerMat = new THREE.MeshBasicMaterial({ color: COL.pink });
@@ -1143,11 +1139,43 @@
       }
     `,
   });
-  // Reuse same uniforms for lake — link the time uniform
-  const waterMatLake = waterMat.clone();
-  waterMatLake.uniforms = waterMat.uniforms;        // share time so they sync
-  // Keep a riverMat alias since the tick loop already references it
-  const riverMat = waterMat;
+  // Procedural River Shader (Customized Water)
+  const riverUniforms = {
+    uTime: { value: 0 },
+    uColor: { value: new THREE.Color(0x5ce5ff) }
+  };
+  const riverMat = new THREE.ShaderMaterial({
+    uniforms: riverUniforms,
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vPos;
+      uniform float uTime;
+      void main() {
+        vUv = uv;
+        vPos = position;
+        float wave = sin(position.x * 0.5 + uTime * 2.0) * 0.5 + cos(position.z * 0.5 + uTime * 1.5) * 0.5;
+        vec3 pos = position;
+        pos.y += wave * 0.5;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vPos;
+      void main() {
+        float foam = sin(vPos.x * 5.0 + uTime * 3.0) * cos(vPos.z * 5.0 - uTime * 2.0);
+        vec3 finalColor = mix(uColor, vec3(1.0), smoothstep(0.8, 1.0, foam));
+        gl_FragColor = vec4(finalColor, 0.8);
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+
+  const waterMatLake = riverMat.clone();
+  waterMatLake.uniforms = riverMat.uniforms;        // share time so they sync
 
   // RIVER — winding strip built from straight segments
   // Path approximated with straight box-segments instead of curve extrusion (simpler, lighter).
@@ -1689,6 +1717,7 @@
     color: 0xd40404, roughness: 0.16, metalness: 0.88,
     emissive: 0x3a0606, emissiveIntensity: 0.08,
   });
+  window.__supercarMat = supercarRed;
   // Brighter "carbon" — dark navy-grey with strong metallic sheen so it catches sunset highlights
   // (was nearly pure black which read as flat shadow against the warm palette)
   const carbonMat = new THREE.MeshStandardMaterial({
@@ -2253,8 +2282,157 @@
   world.addBody(chassis);
 
 
+
+  // ─────────────── DOM-IN-WEBGL IFRAME ───────────────
+  // Creates an iframe that floats over a specific 3D location
+  const iframeContainer = document.createElement('div');
+  iframeContainer.style.position = 'absolute';
+  iframeContainer.style.width = '800px';
+  iframeContainer.style.height = '600px';
+  iframeContainer.style.border = '4px solid #5ce5ff';
+  iframeContainer.style.boxShadow = '0 0 20px #5ce5ff';
+  iframeContainer.style.background = '#000';
+  iframeContainer.style.zIndex = '100'; // above canvas, below UI
+  iframeContainer.style.pointerEvents = 'none'; // let mouse pass through when distant
+  iframeContainer.style.transformOrigin = '0 0';
+  iframeContainer.style.display = 'none';
+
+  const iframe = document.createElement('iframe');
+  iframe.src = 'https://en.wikipedia.org/wiki/Ethical_hacking'; // Or user's blog/resume
+  iframe.style.width = '100%';
+  iframe.style.height = '100%';
+  iframe.style.border = 'none';
+  iframeContainer.appendChild(iframe);
+  document.body.appendChild(iframeContainer);
+
+  const iframeWorldPos = new THREE.Vector3(20, 5, -20); // Position in 3D world
+
+  function updateIframe() {
+    if (!camera) return;
+
+    const dist = camera.position.distanceTo(iframeWorldPos);
+
+    // Only show if close enough
+    if (dist > 50) {
+       iframeContainer.style.display = 'none';
+       return;
+    }
+
+    // Project 3D pos to 2D screen coords
+    const vector = iframeWorldPos.clone();
+    vector.project(camera);
+
+    // Check if behind camera
+    if (vector.z > 1) {
+       iframeContainer.style.display = 'none';
+       return;
+    }
+
+    iframeContainer.style.display = 'block';
+
+    const x = (vector.x * .5 + .5) * window.innerWidth;
+    const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+    // Scale based on distance
+    const scale = 15 / dist;
+
+    iframeContainer.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+
+    // Enable interaction if very close
+    if (dist < 15) {
+      iframeContainer.style.pointerEvents = 'auto';
+    } else {
+      iframeContainer.style.pointerEvents = 'none';
+    }
+  }
+
   // ─────────────── INPUT ───────────────
   const keys = { f: false, b: false, l: false, r: false, jump: false };
+
+  // ─────────────── GARAGE UI LOGIC ───────────────
+  let isGarageOpen = false;
+  window.showGarage = function() {
+    isGarageOpen = true;
+    const garageUI = document.createElement('div');
+    garageUI.id = 'garage-ui';
+    garageUI.style.position = 'absolute';
+    garageUI.style.top = '20px';
+    garageUI.style.right = '20px';
+    garageUI.style.padding = '20px';
+    garageUI.style.background = 'rgba(0, 0, 0, 0.8)';
+    garageUI.style.border = '2px solid #5ce5ff';
+    garageUI.style.borderRadius = '10px';
+    garageUI.style.color = '#fff';
+    garageUI.style.fontFamily = 'monospace';
+    garageUI.style.zIndex = '9999';
+    garageUI.innerHTML = `
+      <h3 style="margin-top:0; color: #5ce5ff; text-shadow: 0 0 10px #5ce5ff;">CYBER GARAGE</h3>
+      <label>Car Color: <input type="color" id="car-color-picker" value="#d40404"></label><br><br>
+      <button id="close-garage" style="background:#5ce5ff; border:none; padding:5px 10px; cursor:pointer; color:#000; font-weight:bold;">CLOSE</button>
+    `;
+    document.body.appendChild(garageUI);
+
+    document.getElementById('car-color-picker').addEventListener('input', (e) => {
+      if (window.__supercarMat) {
+        window.__supercarMat.color.set(e.target.value);
+      }
+    });
+
+    document.getElementById('close-garage').addEventListener('click', () => {
+      isGarageOpen = false;
+      document.body.removeChild(garageUI);
+    });
+  };
+
+  // Bind 'G' key to Garage
+  document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'g' && started && playerMode === 'car' && !isGarageOpen) {
+      window.showGarage();
+    }
+  });
+
+  // ─────────────── CINEMATIC HIRE ME SEQUENCE ───────────────
+  let isCinematicPlaying = false;
+  let cinematicPhase = 0;
+  let cinematicTimer = 0;
+  let originalCameraPos = new THREE.Vector3();
+  window.triggerHireCinematic = function() {
+    if (isCinematicPlaying) return;
+    isCinematicPlaying = true;
+    cinematicPhase = 1;
+    cinematicTimer = 0;
+    originalCameraPos.copy(camera.position);
+
+    // Disable normal controls
+    keys.f = keys.b = keys.l = keys.r = false;
+
+    // Create text overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'cinematic-text';
+    window.__cinematicTextEl = overlay;
+    overlay.style.position = 'absolute';
+    overlay.style.top = '50%';
+    overlay.style.left = '50%';
+    overlay.style.transform = 'translate(-50%, -50%)';
+    overlay.style.color = '#fff';
+    overlay.style.fontFamily = 'monospace';
+    overlay.style.fontSize = '3rem';
+    overlay.style.fontWeight = 'bold';
+    overlay.style.textAlign = 'center';
+    overlay.style.textShadow = '0 0 20px #5ce5ff';
+    overlay.style.zIndex = '10000';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 1s';
+    overlay.innerHTML = 'IMRAN PASHA<br><span style="font-size: 1.5rem; color: #ff00ff;">AVAILABLE FOR HIRE</span>';
+    document.body.appendChild(overlay);
+
+    setTimeout(() => { overlay.style.opacity = '1'; }, 100);
+    setTimeout(() => {
+       overlay.style.opacity = '0';
+       setTimeout(() => { document.body.removeChild(overlay); }, 1000);
+    }, 4000);
+  };
+
   const touch = { x: 0, y: 0, jump: false }; // joystick offset -1..1
   let cameraMode = 0; // 0 follow, 1 high, 2 first
 
@@ -2715,14 +2893,6 @@
     // Animate wings up
     wingScale = Math.min(1, wingScale + dt * 4);
     wings.scale.set(wingScale, wingScale, wingScale);
-
-    // DeLorean wheel tilt in fly mode
-    const targetZRot = Math.PI / 2;
-    for (const w of wheelMeshes) {
-       if (w.userData.tilt === undefined) w.userData.tilt = 0;
-       w.userData.tilt += (targetZRot - w.userData.tilt) * dt * 5;
-       w.rotation.z = w.userData.tilt;
-    }
 
     // Sync mesh
     carGroup.position.copy(chassis.position);
@@ -5668,6 +5838,8 @@
   }
 
   function updateCamera(dt, isStarted) {
+    if (isCinematicPlaying) return; // Wait for our custom cinematic to finish
+
     if (cinematicActive) {
       cinematicT += dt;
       const u = Math.min(1, cinematicT / CINEMATIC_DURATION);
@@ -5848,6 +6020,52 @@
       }
 
       const dt = rawDt * timeScale;
+      // We already declare 't' later in the tick, so let's only use one or declare it locally here if needed,
+      // but wait, let's just use clock.getElapsedTime() where needed.
+      const timeNow = clock.getElapsedTime();
+
+      // Cinematic camera sequence
+      if (isCinematicPlaying) {
+        cinematicTimer += dt;
+
+        // Disable controls continuously to prevent user override
+        keys.w = keys.s = keys.a = keys.d = keys.f = keys.b = keys.l = keys.r = false;
+        keys.up = keys.down = keys.left = keys.right = false;
+
+        if (window.__cinematicTextEl) {
+          // Neon flicker effect
+          window.__cinematicTextEl.style.opacity = Math.random() > 0.95 ? 0.8 : 1;
+        }
+
+        // Circular sweep around the center (0,0)
+        const CINE_DURATION = 15;
+        const phase = Math.min(1.0, cinematicTimer / CINE_DURATION);
+
+        // Eased path
+        const ease = phase < 0.5 ? 4 * phase * phase * phase : 1 - Math.pow(-2 * phase + 2, 3) / 2;
+
+        const radius = 60 - ease * 40; // swoop in from 60 to 20
+        const angle = ease * Math.PI * 2; // full circle rotation
+
+        // Position camera for sweep (always same path, start UI handled by transparency if needed)
+        camera.position.set(
+          Math.cos(angle) * radius,
+          25 - ease * 15, // descend from 25 to 10
+          Math.sin(angle) * radius
+        );
+        camera.lookAt(0, 2, 0);
+
+        if (cinematicTimer >= CINE_DURATION) {
+          isCinematicPlaying = false;
+          if (window.__cinematicTextEl) {
+            document.body.removeChild(window.__cinematicTextEl);
+            window.__cinematicTextEl = null;
+          }
+          // Return to normal
+          camera.position.copy(originalCameraPos);
+        }
+      }
+
       // also scale Cannon world step?
       if (started) {
         let drv;
@@ -5913,6 +6131,7 @@
       updateCamera(dt, started);
       // Billboard labels to camera
       billboardLabels.forEach(l => l.lookAt(camera.position));
+      updateIframe();
       // Pulse rings
       const t = clock.getElapsedTime();
 

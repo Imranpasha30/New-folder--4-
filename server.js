@@ -9,7 +9,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 5181;
+const PORT = process.env.PORT || 5181;
 const ROOT = __dirname;
 // Persistent visit log — survives container restarts (mounted as Docker volume in prod).
 // In local dev, defaults to a file in the project root.

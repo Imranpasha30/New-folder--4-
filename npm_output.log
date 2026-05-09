@@ -1,0 +1,3 @@
+[visits] loaded 31 visits, 3 unique from /app/visits.json
+[chat] no Gemini key (env GEMINI_KEY unset and no gemini.key file) — chatbot returns stubs.
+http://localhost:3000/ (no-cache, with /api/chat proxy)
