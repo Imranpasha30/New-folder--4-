@@ -3,8 +3,13 @@
 # 80/443 to the host. Web + MP are reachable only inside the container network.
 #
 # Required environment variables (set by deploy.yml or via shell export):
-#   GHCR_IMAGE  — full image name like ghcr.io/imranpasha30/portfolio:latest
-#   GEMINI_KEY  — passed through to the web service for the chatbot proxy
+#   GHCR_IMAGE          — full image name like ghcr.io/imranpasha30/portfolio:latest
+#   GEMINI_KEY          — passed through to the web service for the chatbot proxy
+#   GMAIL_USER          — sender Gmail address for the contact form
+#   GMAIL_APP_PASSWORD  — 16-char app password (myaccount.google.com/apppasswords, 2FA required)
+#   CONTACT_TO          — recipient address (defaults to GMAIL_USER)
+#   HCAPTCHA_SITE_KEY   — public site key from dashboard.hcaptcha.com (free tier)
+#   HCAPTCHA_SECRET     — server secret key (NEVER commit; never expose to client)
 services:
   web:
     image: ${GHCR_IMAGE}
@@ -14,6 +19,11 @@ services:
       - NODE_ENV=production
       - GEMINI_KEY=${GEMINI_KEY}
       - VISITS_DATA_DIR=/data
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+      - CONTACT_TO=${CONTACT_TO:-}
+      - HCAPTCHA_SITE_KEY=${HCAPTCHA_SITE_KEY}
+      - HCAPTCHA_SECRET=${HCAPTCHA_SECRET}
     expose:
       - "5181"
     volumes:

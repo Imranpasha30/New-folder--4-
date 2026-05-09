@@ -2285,69 +2285,6 @@
 
 
 
-  // ─────────────── DOM-IN-WEBGL IFRAME ───────────────
-  // Creates an iframe that floats over a specific 3D location
-  const iframeContainer = document.createElement('div');
-  iframeContainer.style.position = 'absolute';
-  iframeContainer.style.width = '800px';
-  iframeContainer.style.height = '600px';
-  iframeContainer.style.border = '4px solid #5ce5ff';
-  iframeContainer.style.boxShadow = '0 0 20px #5ce5ff';
-  iframeContainer.style.background = '#000';
-  iframeContainer.style.zIndex = '100'; // above canvas, below UI
-  iframeContainer.style.pointerEvents = 'none'; // let mouse pass through when distant
-  iframeContainer.style.transformOrigin = '0 0';
-  iframeContainer.style.display = 'none';
-
-  const iframe = document.createElement('iframe');
-  iframe.src = 'https://en.wikipedia.org/wiki/Ethical_hacking'; // Or user's blog/resume
-  iframe.style.width = '100%';
-  iframe.style.height = '100%';
-  iframe.style.border = 'none';
-  iframeContainer.appendChild(iframe);
-  document.body.appendChild(iframeContainer);
-
-  const iframeWorldPos = new THREE.Vector3(20, 5, -20); // Position in 3D world
-
-  function updateIframe() {
-    if (!camera) return;
-
-    const dist = camera.position.distanceTo(iframeWorldPos);
-
-    // Only show if close enough
-    if (dist > 50) {
-       iframeContainer.style.display = 'none';
-       return;
-    }
-
-    // Project 3D pos to 2D screen coords
-    const vector = iframeWorldPos.clone();
-    vector.project(camera);
-
-    // Check if behind camera
-    if (vector.z > 1) {
-       iframeContainer.style.display = 'none';
-       return;
-    }
-
-    iframeContainer.style.display = 'block';
-
-    const x = (vector.x * .5 + .5) * window.innerWidth;
-    const y = (-(vector.y * .5) + .5) * window.innerHeight;
-
-    // Scale based on distance
-    const scale = 15 / dist;
-
-    iframeContainer.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-
-    // Enable interaction if very close
-    if (dist < 15) {
-      iframeContainer.style.pointerEvents = 'auto';
-    } else {
-      iframeContainer.style.pointerEvents = 'none';
-    }
-  }
-
   // ─────────────── INPUT ───────────────
   const keys = { f: false, b: false, l: false, r: false, jump: false };
 
@@ -2555,7 +2492,7 @@
     playerMode = 'walk';
     manGroup.visible = true;
     manGroup.position.set(carGroup.position.x + 2, 0, carGroup.position.z);
-    if (window.__imranToast) window.__imranToast('🚶 Back on foot · E near car to drive · M anywhere to drive');
+    if (window.__imranToast) window.__imranToast('🚶 Back on foot · Q near car to drive · M anywhere to drive');
   }
   // Expose for external use
   window.__imranPlayer = { enterWalk: enterWalkMode, exitWalk: exitWalkMode, getMode: () => playerMode };
@@ -2672,23 +2609,26 @@
     }
     if (e.code === 'KeyE' || e.code === 'Enter') {
       window.__imranEHeld = true;            // for bunker easter-egg hold detection
-      // If walking and near the car (within 5m), enter the car
-      if (playerMode === 'walk' && Math.hypot(
-          manGroup.position.x - carGroup.position.x,
-          manGroup.position.z - carGroup.position.z) < 5) {
-        exitWalkMode();
-      }
-      // If on a balloon ride pad, enter balloon ride (E to enter, M to exit)
-      else if (activeZone && activeZone.key === 'balloon_ride_pad' && activeZone.rideTarget
-               && playerMode !== 'balloon_ride' && playerMode !== 'cable_ride') {
-        enterRideMode(activeZone.rideTarget, 'balloon');
-      }
-      // If on the projects pad, open the currently displayed project
-      else if (activeZone && activeZone.key === 'projects') {
+      // E is now reserved for INFO interactions only — open project, open demo modal.
+      // Balloon-board moved to B, get-in-car moved to Q (one key = one operation).
+      if (activeZone && activeZone.key === 'projects') {
         window.__imranProjectOpen();
       } else {
         window.dispatchEvent(new Event('imran:interact'));
       }
+    }
+    // B — board balloon (when standing on a balloon_ride_pad). Distinct from E to avoid clash with cloud demo.
+    if (e.code === 'KeyB') {
+      if (activeZone && activeZone.key === 'balloon_ride_pad' && activeZone.rideTarget
+          && playerMode !== 'balloon_ride' && playerMode !== 'cable_ride') {
+        enterRideMode(activeZone.rideTarget, 'balloon');
+      }
+    }
+    // Q — get into the car (when walking within 5m of it). Was on E too — moved off.
+    if (e.code === 'KeyQ' && playerMode === 'walk' && Math.hypot(
+        manGroup.position.x - carGroup.position.x,
+        manGroup.position.z - carGroup.position.z) < 5) {
+      exitWalkMode();
     }
     // R key — ride the cable car (only when on/near the station deck)
     if (e.code === 'KeyT' && playerMode !== 'cable_ride') {
@@ -2790,6 +2730,8 @@
     camera: 'KeyC',
     fly: 'KeyL',
     reset: 'KeyR',
+    board: 'KeyB',     // board balloon
+    enter: 'KeyQ',     // get into car
   };
   function tapKey(code) {
     const down = new KeyboardEvent('keydown', { code, bubbles: true });
@@ -3296,53 +3238,17 @@
   // The big glowing scoreboard panel — moved down to fit shorter tower
   const towerScreenW = 4.5, towerScreenH = 2.2;
   const towerScreenY = 7.5;
+  // Visit count + guestbook ticker moved out of 3D — they now live as a fixed 2D HTML banner
+  // (#visitorBanner in Portfolio.html). The 3D screens were colliding visually with the obelisk
+  // and getting hard to read from camera angles. Keeping just an offscreen canvas so the
+  // existing drawTowerScreen/drawTowerTicker functions still update something — they get
+  // pulled into the banner via __imranTowerHTML below.
   const towerScreenCanvas = document.createElement('canvas');
   towerScreenCanvas.width = 640; towerScreenCanvas.height = 320;
   const towerScreenCtx = towerScreenCanvas.getContext('2d');
-  const towerScreenTex = new THREE.CanvasTexture(towerScreenCanvas);
-  towerScreenTex.colorSpace = THREE.SRGBColorSpace;
-  const towerScreenMat = new THREE.MeshStandardMaterial({
-    map: towerScreenTex,
-    emissive: 0xffb070, emissiveIntensity: 0.9,
-    roughness: 0.4,
-  });
-  const towerScreen = new THREE.Mesh(
-    new THREE.PlaneGeometry(towerScreenW, towerScreenH),
-    towerScreenMat
-  );
-  towerScreen.position.set(0, towerScreenY, 1.05);    // protrudes from front face
-  vTowerGroup.add(towerScreen);
-  // Backside copy so the count reads from the other direction too
-  const towerScreenBack = new THREE.Mesh(
-    new THREE.PlaneGeometry(towerScreenW, towerScreenH),
-    towerScreenMat
-  );
-  towerScreenBack.position.set(0, towerScreenY, -1.05);
-  towerScreenBack.rotation.y = Math.PI;
-  vTowerGroup.add(towerScreenBack);
-
-  // Scrolling guestbook ticker below the main display (smaller panel)
   const towerTickerCanvas = document.createElement('canvas');
   towerTickerCanvas.width = 640; towerTickerCanvas.height = 160;
   const towerTickerCtx = towerTickerCanvas.getContext('2d');
-  const towerTickerTex = new THREE.CanvasTexture(towerTickerCanvas);
-  towerTickerTex.colorSpace = THREE.SRGBColorSpace;
-  const towerTickerMat = new THREE.MeshStandardMaterial({
-    map: towerTickerTex, emissive: 0x5ce5ff, emissiveIntensity: 0.5, roughness: 0.4,
-  });
-  const towerTicker = new THREE.Mesh(
-    new THREE.PlaneGeometry(towerScreenW, 1.4),
-    towerTickerMat
-  );
-  towerTicker.position.set(0, towerScreenY - 2.3, 1.05);
-  vTowerGroup.add(towerTicker);
-  const towerTickerBack = new THREE.Mesh(
-    new THREE.PlaneGeometry(towerScreenW, 1.4),
-    towerTickerMat
-  );
-  towerTickerBack.position.set(0, towerScreenY - 2.3, -1.05);
-  towerTickerBack.rotation.y = Math.PI;
-  vTowerGroup.add(towerTickerBack);
 
   // Top accent — rotating amber crystal (octahedron)
   const towerCrystal = new THREE.Mesh(
@@ -3400,7 +3306,14 @@
       c.fillText('+1', 540, 80 - (1 - a) * 40);
       c.globalAlpha = 1;
     }
-    towerScreenTex.needsUpdate = true;
+    // Push the live count to the 2D HTML banner (#visitorBanner)
+    if (window.__updateVisitorBanner) {
+      window.__updateVisitorBanner({
+        total: visitState.total,
+        unique: visitState.unique,
+        plusOne: visitState.plusOneT > 0,
+      });
+    }
   }
   let tickerScroll = 0;
   function drawTowerTicker() {
@@ -3432,7 +3345,8 @@
       c.fillStyle = i < lines.length ? '#9ce6ff' : '#5cb8d9';
       c.fillText(lines[i % lines.length], 14, y);
     }
-    towerTickerTex.needsUpdate = true;
+    // Push the guestbook line list to the 2D HTML banner
+    if (window.__updateVisitorTicker) window.__updateVisitorTicker(lines);
   }
   function secsAgo(ts) {
     const s = Math.floor((Date.now() - ts) / 1000);
@@ -3676,6 +3590,25 @@
     x: STATION_X, z: STATION_Z, radius: 18, key: 'vpn_demo',
     label: 'VPN TUNNEL', ring: null, lab: vpnDemoSign
   });
+
+  // ─── Observability Tower demo — sign + zone at the existing Observation Tower (85, 65) ───
+  // Triggers the Live Observability dashboard modal showing real metrics from THIS server.
+  const obsDemoPost = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.14, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  obsDemoPost.position.set(78, 2, 65);     // a few meters in front of the tower base
+  scene.add(obsDemoPost);
+  const obsDemoSign = makeLabel('📊 LIVE OBSERVABILITY — press E', '#9fef00', 70);
+  obsDemoSign.position.set(78, 4, 65);
+  obsDemoSign.scale.set(0.6, 0.6, 0.6);
+  obsDemoSign.userData.noBillboard = true;
+  scene.add(obsDemoSign);
+  zones.push({
+    x: 85, z: 65, radius: 18, key: 'observability',
+    label: 'LIVE OBSERVABILITY', ring: null, lab: obsDemoSign
+  });
+
   // Turn-off signpost on Pasha Boulevard (z=0, x=42 — at NS-42E intersection with EW-0)
   // Tells the player driving east on the boulevard to turn left for the cable car
   const turnSignPost = new THREE.Mesh(
@@ -5481,7 +5414,7 @@
     backend:   ['Node.js', 'Express', 'GraphQL', 'REST', 'WebSocket'],
     databases: ['MongoDB', 'PostgreSQL', 'Redis', 'MySQL'],
     devops:    ['Docker', 'Kubernetes', 'AWS', 'GitHub Actions', 'Linux'],
-    security:  ['Burp Suite', 'Nmap', 'Metasploit', 'OWASP Top 10', 'HackTheBox', 'CTF'],
+    security:  ['Burp Suite', 'Nmap', 'Metasploit', 'OWASP Top 10', 'TryHackMe', 'CTF'],
     mobile:    ['React Native', 'Android (Java/Kotlin)'],
     tools:     ['Git', 'Vim', 'VSCode', 'Wireshark', 'Postman'],
   };
@@ -5565,12 +5498,165 @@
   const mbFlag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.6, 1.2), new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 0.4 }));
   mbFlag.position.set(mailboxX + 1.55, 3, mailboxZ + 1); scene.add(mbFlag);
 
+  // ─────────────── 📄 RESUME DROP-BOX (next to the mailbox) ───────────────
+  // Wooden file box prop. Drive into the zone → press E → resume.html opens for download/print.
+  const resumeBoxX = 6, resumeBoxZ = -68;
+  const resumeBox = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 1.6, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.85 })
+  );
+  resumeBox.position.set(resumeBoxX, 0.8, resumeBoxZ);
+  resumeBox.castShadow = true; resumeBox.receiveShadow = true;
+  scene.add(resumeBox);
+  // Lid (slightly raised + tilted to suggest "open")
+  const resumeLid = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.1, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a28, roughness: 0.85 })
+  );
+  resumeLid.position.set(resumeBoxX, 1.65, resumeBoxZ - 0.1);
+  resumeLid.rotation.x = -0.25;
+  scene.add(resumeLid);
+  // Stack of papers sticking out
+  const resumePapers = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.4, 1.2),
+    new THREE.MeshStandardMaterial({ color: 0xfffbea, roughness: 0.7, emissive: 0xffe066, emissiveIntensity: 0.15 })
+  );
+  resumePapers.position.set(resumeBoxX, 1.8, resumeBoxZ);
+  scene.add(resumePapers);
+  // "RESUME" text on the box face
+  const resumeLabel = makeLabel('📄 RESUME — press E', '#ffe066', 70);
+  resumeLabel.position.set(resumeBoxX, 3.6, resumeBoxZ);
+  resumeLabel.scale.set(0.45, 0.45, 0.45);
+  resumeLabel.userData.noBillboard = true;
+  scene.add(resumeLabel);
+  zones.push({
+    x: resumeBoxX, z: resumeBoxZ, radius: 4, key: 'resume_drop',
+    label: 'RESUME', ring: null, lab: resumeLabel
+  });
+
+  // ─────────────── 📅 BOOK-A-CALL PHONE BOOTH (Welcome Plaza, west side) ───────────────
+  // Wood + glass phone-booth. Drive in → press E → "Book a 30-min intro call" modal.
+  const boothX = -16, boothZ = 6;
+  const boothBase = new THREE.Mesh(
+    new THREE.BoxGeometry(2.6, 0.3, 2.6),
+    new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+  );
+  boothBase.position.set(boothX, 0.15, boothZ);
+  boothBase.receiveShadow = true;
+  scene.add(boothBase);
+  // 4 wooden corner posts
+  for (const [dx, dz] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
+    const post = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, 4.0, 0.25),
+      new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.85 })
+    );
+    post.position.set(boothX + dx, 2.1, boothZ + dz);
+    post.castShadow = true;
+    scene.add(post);
+  }
+  // Glass walls (3 sides — front open)
+  for (const [w, d, ox, oz] of [[2.4, 0.08, 0, -1.15], [0.08, 2.4, -1.15, 0], [0.08, 2.4, 1.15, 0]]) {
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(w, 3.4, d),
+      new THREE.MeshStandardMaterial({
+        color: 0x5ce5ff, transparent: true, opacity: 0.25,
+        emissive: 0x5ce5ff, emissiveIntensity: 0.2, roughness: 0.1, metalness: 0.4,
+      })
+    );
+    glass.position.set(boothX + ox, 1.9, boothZ + oz);
+    scene.add(glass);
+  }
+  // Roof
+  const boothRoof = new THREE.Mesh(
+    new THREE.BoxGeometry(2.8, 0.3, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0xa83232, roughness: 0.7 })
+  );
+  boothRoof.position.set(boothX, 4.05, boothZ);
+  boothRoof.castShadow = true;
+  scene.add(boothRoof);
+  // Glowing "📅 BOOK A CALL" sign on top
+  const boothLabel = makeLabel('📅 BOOK A CALL', '#5ce5ff', 90);
+  boothLabel.position.set(boothX, 5.0, boothZ);
+  boothLabel.scale.set(0.55, 0.55, 0.55);
+  boothLabel.userData.noBillboard = true;
+  scene.add(boothLabel);
+  // Tiny phone receiver dangling inside
+  const boothPhone = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.1, 0.7, 6),
+    new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.5, metalness: 0.6 })
+  );
+  boothPhone.rotation.z = Math.PI / 4;
+  boothPhone.position.set(boothX, 2.5, boothZ - 1.05);
+  scene.add(boothPhone);
+  // Glow light inside the booth (welcoming)
+  const boothLight = new THREE.PointLight(0x5ce5ff, 0.9, 8, 2);
+  boothLight.position.set(boothX, 3, boothZ);
+  scene.add(boothLight);
+  zones.push({
+    x: boothX, z: boothZ, radius: 4, key: 'book_call',
+    label: 'BOOK A CALL', ring: null, lab: boothLabel
+  });
+
+  // ─────────────── 💼 HIRE PACKAGES TOWER (visible from boulevard) ───────────────
+  // Tall pillar with 3 stacked tier signs (Audit / Project / Retainer). E → modal with full pricing.
+  const pkgX = 50, pkgZ = 16;
+  const pkgPillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 1.0, 9, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3e3848, roughness: 0.8, metalness: 0.3 })
+  );
+  pkgPillar.position.set(pkgX, 4.5, pkgZ);
+  pkgPillar.castShadow = true; pkgPillar.receiveShadow = true;
+  scene.add(pkgPillar);
+  // 3 horizontal price-tier disks (color-coded)
+  const tierData = [
+    { y: 7.5, color: 0xff6a3a, label: 'AUDIT · from $X/day' },
+    { y: 5.5, color: 0x5ce5ff, label: 'PROJECT · fixed-price' },
+    { y: 3.5, color: 0x9fef00, label: 'RETAINER · monthly' },
+  ];
+  for (const tier of tierData) {
+    const disk = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.2, 2.2, 0.4, 24),
+      new THREE.MeshStandardMaterial({
+        color: tier.color, emissive: tier.color, emissiveIntensity: 0.4,
+        roughness: 0.4, metalness: 0.3,
+      })
+    );
+    disk.position.set(pkgX, tier.y, pkgZ);
+    disk.castShadow = true;
+    scene.add(disk);
+    const tierLab = makeLabel(tier.label, '#ffffff', 60);
+    tierLab.position.set(pkgX, tier.y + 0.4, pkgZ + 2.3);
+    tierLab.scale.set(0.45, 0.45, 0.45);
+    tierLab.userData.noBillboard = true;
+    scene.add(tierLab);
+  }
+  // Top — glowing crystal cap
+  const pkgCap = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.9, 0),
+    new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffe066, emissiveIntensity: 1.2 })
+  );
+  pkgCap.position.set(pkgX, 9.8, pkgZ);
+  scene.add(pkgCap);
+  const pkgLight = new THREE.PointLight(0xffe066, 1.2, 25, 2);
+  pkgLight.position.set(pkgX, 9.8, pkgZ);
+  scene.add(pkgLight);
+  // Header sign at the base
+  const pkgHeader = makeLabel('💼 HIRE PACKAGES — press E', '#ffe066', 80);
+  pkgHeader.position.set(pkgX, 1.5, pkgZ + 2.5);
+  pkgHeader.scale.set(0.55, 0.55, 0.55);
+  pkgHeader.userData.noBillboard = true;
+  scene.add(pkgHeader);
+  zones.push({
+    x: pkgX, z: pkgZ, radius: 6, key: 'hire_packages',
+    label: 'HIRE PACKAGES', ring: null, lab: pkgHeader
+  });
+
   // ─ SOCIAL ZONE — 4 floating glowing icons (drive under to "open")
   const SOCIALS = [
-    { name: 'GitHub',     url: 'https://github.com/Imranpasha30',                    brand: 0x24292e, color: 0xffffff },
-    { name: 'LinkedIn',   url: 'https://www.linkedin.com/in/imran-pasha-/',          brand: 0x0a66c2, color: 0x0a66c2 },
-    { name: 'Twitter',    url: 'https://twitter.com/',                                brand: 0x000000, color: 0xffffff },
-    { name: 'HackTheBox', url: 'https://www.hackthebox.com/',                         brand: 0x9fef00, color: 0x9fef00 },
+    { name: 'GitHub',     url: 'https://github.com/Imranpasha30',                            brand: 0x24292e, color: 0xffffff },
+    { name: 'LinkedIn',   url: 'https://www.linkedin.com/in/imran-pasha-019b2b213/',          brand: 0x0a66c2, color: 0x0a66c2 },
+    { name: 'Instagram',  url: 'https://www.instagram.com/beast_forge_x/',                    brand: 0xe1306c, color: 0xe1306c },
+    { name: 'TryHackMe',  url: 'https://tryhackme.com/p/devilhost666',                        brand: 0x88cc14, color: 0x88cc14 },
   ];
 
   // Procedural logo painter — draws the recognisable brand mark for each social into a CanvasTexture.
@@ -5605,35 +5691,44 @@
       c.font = 'bold 170px "Helvetica", Arial, sans-serif';
       c.textAlign = 'center'; c.textBaseline = 'middle';
       c.fillText('in', 128, 148);
-    } else if (name === 'Twitter') {
-      // X (rebrand) — black square with white X mark
-      c.fillStyle = '#000000';
+    } else if (name === 'Instagram') {
+      // Instagram — pink/orange/purple gradient square with white camera outline
+      const grad = c.createLinearGradient(8, 8, 248, 248);
+      grad.addColorStop(0, '#feda75');
+      grad.addColorStop(0.3, '#fa7e1e');
+      grad.addColorStop(0.6, '#d62976');
+      grad.addColorStop(0.85, '#962fbf');
+      grad.addColorStop(1, '#4f5bd5');
+      c.fillStyle = grad;
+      roundRect(c, 8, 8, 240, 240, 50); c.fill();
+      // Camera outline (rounded square)
+      c.strokeStyle = '#ffffff'; c.lineWidth = 16;
+      roundRect(c, 56, 56, 144, 144, 32); c.stroke();
+      // Lens circle
+      c.beginPath(); c.arc(128, 128, 38, 0, Math.PI*2); c.stroke();
+      // Top-right dot
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(180, 76, 9, 0, Math.PI*2); c.fill();
+    } else if (name === 'TryHackMe') {
+      // TryHackMe — dark navy + lime green flame logo
+      c.fillStyle = '#1d2330';
       roundRect(c, 8, 8, 240, 240, 38); c.fill();
-      c.strokeStyle = '#ffffff'; c.lineWidth = 38; c.lineCap = 'round';
-      c.beginPath(); c.moveTo(72, 72); c.lineTo(184, 184); c.stroke();
-      c.beginPath(); c.moveTo(184, 72); c.lineTo(72, 184); c.stroke();
-    } else if (name === 'HackTheBox') {
-      // HTB green hexagonal mark on black
-      c.fillStyle = '#0e1a0e';
-      roundRect(c, 8, 8, 240, 240, 38); c.fill();
-      // Hexagon
-      c.strokeStyle = '#9fef00'; c.lineWidth = 12; c.lineJoin = 'round';
+      // Stylized flame (simplified)
+      c.fillStyle = '#88cc14';
       c.beginPath();
-      const hex = [];
-      for (let i = 0; i < 6; i++) {
-        const a = Math.PI/3 * i - Math.PI/2;
-        hex.push([128 + 80 * Math.cos(a), 128 + 80 * Math.sin(a)]);
-      }
-      c.moveTo(hex[0][0], hex[0][1]);
-      for (let i = 1; i < 6; i++) c.lineTo(hex[i][0], hex[i][1]);
-      c.closePath(); c.stroke();
-      // Inner ::HTB:: text style — bracket marks
-      c.fillStyle = '#9fef00';
-      c.font = 'bold 64px "JetBrains Mono", monospace';
+      c.moveTo(128, 60);
+      c.bezierCurveTo(170, 100, 180, 140, 152, 168);
+      c.bezierCurveTo(184, 152, 200, 188, 168, 210);
+      c.bezierCurveTo(192, 200, 80, 200, 92, 168);
+      c.bezierCurveTo(64, 184, 80, 124, 110, 130);
+      c.bezierCurveTo(96, 100, 110, 80, 128, 60);
+      c.closePath();
+      c.fill();
+      // "THM" label
+      c.fillStyle = '#ffffff';
+      c.font = 'bold 30px "JetBrains Mono", monospace';
       c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText('HTB', 128, 130);
-      c.font = 'bold 24px "JetBrains Mono", monospace';
-      c.fillText('::    ::', 128, 170);
+      c.fillText('THM', 128, 230);
     }
     function roundRect(ctx, x, y, w, h, r) {
       ctx.beginPath();
@@ -5976,11 +6071,20 @@
   // ─────────────── ZONE DETECTION ───────────────
   let activeZone = null;
   function checkZones() {
-    const cx = carGroup.position.x, cz = carGroup.position.z;
+    // Use the player's actual position (man if walking, car otherwise) so walking up to a
+    // balloon pad triggers the right zone too.
+    const cx = (playerMode === 'walk' ? manGroup.position.x : carGroup.position.x);
+    const cz = (playerMode === 'walk' ? manGroup.position.z : carGroup.position.z);
+    // Pick the SMALLEST-radius zone the player is inside — most-specific wins over background
+    // catch-all zones (e.g. a 3m balloon-ride pad beats the 22m cloud-security demo zone).
     let entered = null;
+    let bestRadius = Infinity;
     for (const z of zones) {
       const d = Math.hypot(cx - z.x, cz - z.z);
-      if (d < z.radius + 0.5) { entered = z; break; }
+      if (d < z.radius + 0.5 && z.radius < bestRadius) {
+        entered = z;
+        bestRadius = z.radius;
+      }
     }
     if (entered !== activeZone) {
       activeZone = entered;
@@ -6014,14 +6118,10 @@
     requestAnimationFrame(tick);
     try {
       let rawDt = Math.min(clock.getDelta(), 1/30);
-      let timeScale = 1.0;
-
-      // Matrix-style slow motion when jumping high
-      if (chassis && chassis.position.y > 6 && !flyMode && playerMode === 'car') {
-         timeScale = 0.3; // 30% speed
-      }
-
-      const dt = rawDt * timeScale;
+      // Matrix-style slow-motion (was: scale dt to 30% when chassis.y > 6) was removed —
+      // it triggered constantly on the flyover, ramps, and small bumps, making the car feel slow/jittery.
+      const dt = rawDt;
+      const timeScale = 1.0;
       // We already declare 't' later in the tick, so let's only use one or declare it locally here if needed,
       // but wait, let's just use clock.getElapsedTime() where needed.
       const timeNow = clock.getElapsedTime();
@@ -6133,7 +6233,6 @@
       updateCamera(dt, started);
       // Billboard labels to camera
       billboardLabels.forEach(l => l.lookAt(camera.position));
-      updateIframe();
       // Pulse rings
       const t = clock.getElapsedTime();
 
@@ -6254,7 +6353,7 @@
             manGroup.position.x - carGroup.position.x,
             manGroup.position.z - carGroup.position.z);
           if (distCar < 5 && (t - (window.__lastEnterHint || 0) > 8)) {
-            window.__imranToast('🚗 press <kbd>E</kbd> to get in the car');
+            window.__imranToast('🚗 press <kbd>Q</kbd> to get in the car');
             window.__lastEnterHint = t;
           }
         }

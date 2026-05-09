@@ -5,16 +5,77 @@
 // - WebSocket multiplayer is in multiplayer-server.js (port 5182).
 //
 // Run: node server.js
+// Auto-load .env (GEMINI_KEY, GMAIL_USER, GMAIL_APP_PASSWORD, HCAPTCHA_*, etc.) so we don't
+// need to set them in the shell every time. Falls through silently if .env doesn't exist.
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const PORT = process.env.PORT || 5181;
 const ROOT = __dirname;
+
+// ─── Contact form config (Nodemailer + Gmail app-password + hCaptcha) ───
+// Required env vars (set via .env / docker-compose / EC2 instance env):
+//   GMAIL_USER          — e.g. imranpasha.ahmed@gmail.com
+//   GMAIL_APP_PASSWORD  — 16-char app password (NOT your Gmail login). Generate at:
+//                         https://myaccount.google.com/apppasswords (requires 2FA enabled)
+//   CONTACT_TO          — recipient address (defaults to GMAIL_USER)
+//   HCAPTCHA_SITE_KEY   — public site key from https://dashboard.hcaptcha.com (free)
+//   HCAPTCHA_SECRET     — secret server key (NEVER expose to client)
+const GMAIL_USER = process.env.GMAIL_USER || '';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+const CONTACT_TO = process.env.CONTACT_TO || GMAIL_USER || 'imranpasha.ahmed@gmail.com';
+const HCAPTCHA_SITE_KEY = process.env.HCAPTCHA_SITE_KEY || '';
+const HCAPTCHA_SECRET   = process.env.HCAPTCHA_SECRET   || '';
+
+let mailTransporter = null;
+if (GMAIL_USER && GMAIL_APP_PASSWORD) {
+  mailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+  });
+  console.log('[contact] Nodemailer ready (Gmail SMTP, sender =', GMAIL_USER + ')');
+} else {
+  console.warn('[contact] GMAIL_USER / GMAIL_APP_PASSWORD not set — /api/contact will log to console only.');
+}
+if (!HCAPTCHA_SECRET) {
+  console.warn('[contact] HCAPTCHA_SECRET not set — captcha verification will be SKIPPED (dev mode).');
+}
+
+// Simple in-memory rate limiter for /api/contact: max 3 submissions per IP per 10 min.
+const contactRateLimit = new Map();
+function rateLimitOk(ip) {
+  const now = Date.now();
+  const recent = (contactRateLimit.get(ip) || []).filter(t => now - t < 10 * 60 * 1000);
+  if (recent.length >= 3) { contactRateLimit.set(ip, recent); return false; }
+  recent.push(now);
+  contactRateLimit.set(ip, recent);
+  return true;
+}
+
+// Verify an hCaptcha response token via the official siteverify endpoint
+async function verifyHCaptcha(token, ip) {
+  if (!HCAPTCHA_SECRET) return true;          // dev mode — accept everything
+  if (!token) return false;
+  const params = new URLSearchParams({ secret: HCAPTCHA_SECRET, response: token, remoteip: ip || '' });
+  try {
+    const res = await fetch('https://hcaptcha.com/siteverify', { method: 'POST', body: params });
+    const data = await res.json();
+    return !!data.success;
+  } catch (e) { console.warn('[contact] hCaptcha verify failed:', e.message); return false; }
+}
 // Persistent visit log — survives container restarts (mounted as Docker volume in prod).
 // In local dev, defaults to a file in the project root.
 const DATA_DIR = process.env.VISITS_DATA_DIR || ROOT;
 const VISITS_FILE = path.join(DATA_DIR, 'visits.json');
+
+// HTML-escape helper (used for the contact email template)
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // Load existing visits on boot, or initialize empty
 let visitData = { total: 0, unique: 0, recent: [], uuids: {} };
@@ -62,12 +123,14 @@ const SYSTEM_PROMPT = `You are AI-Imran, a digital twin of Imran Pasha — a ful
 Tone: friendly, witty, concise. Reply in 1-3 short sentences unless the visitor asks for detail. Use casual contractions.
 
 About Imran:
-- Full-stack engineer (MERN, GraphQL, Node, React) + cybersecurity (Burp Suite, Nmap, OWASP, HackTheBox)
+- Full-stack engineer (MERN, GraphQL, Node, React) + cybersecurity (Burp Suite, Nmap, OWASP, TryHackMe top 15%)
 - Built MERN+GraphQL apps, ChatZ, Logistics, Travellers, Map_OJ (online judge)
 - Available for hire Q2 2026
 - Email: imranpasha.ahmed@gmail.com
 - GitHub: github.com/Imranpasha30
-- LinkedIn: linkedin.com/in/imran-pasha-/
+- LinkedIn: linkedin.com/in/imran-pasha-019b2b213/
+- Instagram: instagram.com/beast_forge_x
+- TryHackMe: tryhackme.com/p/devilhost666 (rank top 15%, 49 rooms, 9 badges)
 
 If asked technical questions, answer like an experienced engineer. If asked about hiring/availability, point them to the email. Don't make up biographical facts — if you don't know, say "I'd say ask the real Imran" with a wink.
 
@@ -113,11 +176,157 @@ async function callGemini(message, history = []) {
   return text || '(no response from AI)';
 }
 
+// ─── Observability counters — incremented in the request loop ───
+const obsState = {
+  startTime: Date.now(),
+  totalRequests: 0,
+  apiRequests: 0,
+  chatRequests: 0,
+  visitRequests: 0,
+  // Rolling window of last 60 seconds — entries: { ts, route }
+  recent: [],
+};
+function recordRequest(url) {
+  const now = Date.now();
+  obsState.totalRequests++;
+  obsState.recent.push({ ts: now, url });
+  // Drop entries older than 60s
+  while (obsState.recent.length > 0 && now - obsState.recent[0].ts > 60_000) obsState.recent.shift();
+  if (url.startsWith('/api/')) obsState.apiRequests++;
+  if (url.startsWith('/api/chat')) obsState.chatRequests++;
+  if (url.startsWith('/api/visit')) obsState.visitRequests++;
+}
+
 const server = http.createServer(async (req, res) => {
+  recordRequest(req.url || '/');
   // CORS — allow same-origin only via no headers, but for /api allow all (dev)
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' });
     res.end(); return;
+  }
+
+  // ─── /api/config GET — public client config (hCaptcha sitekey only) ───
+  if (req.url === '/api/config' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ hcaptchaSiteKey: HCAPTCHA_SITE_KEY }));
+    return;
+  }
+
+  // ─── /api/contact POST — hire/booking submissions → email via Nodemailer ───
+  if (req.url === '/api/contact' && req.method === 'POST') {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').toString().split(',')[0].trim();
+    if (!rateLimitOk(ip)) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'Rate limit: 3 messages per 10 minutes' }));
+      return;
+    }
+    let body = '';
+    req.on('data', (chunk) => { body += chunk.toString(); if (body.length > 12_000) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const data = JSON.parse(body);
+        // Validate required fields
+        const name  = (data.name  || '').toString().trim().slice(0, 200);
+        const email = (data.email || '').toString().trim().slice(0, 200);
+        const kind  = (data.kind  || 'general enquiry').toString().trim().slice(0, 200);
+        const msg   = (data.message || '').toString().trim().slice(0, 5000);
+        const captchaToken = (data.captcha || '').toString();
+        if (!email || !email.includes('@')) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Valid email required' }));
+          return;
+        }
+        if (!msg) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Message required' }));
+          return;
+        }
+        // Verify captcha (skipped in dev if HCAPTCHA_SECRET unset)
+        const captchaOk = await verifyHCaptcha(captchaToken, ip);
+        if (!captchaOk) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Captcha failed — please complete the challenge' }));
+          return;
+        }
+        // Compose email
+        const subject = `[Portfolio] ${kind} — ${name || email}`;
+        const text = `New submission from your 3D portfolio:
+
+Name:    ${name || '(not given)'}
+Email:   ${email}
+Type:    ${kind}
+IP:      ${ip}
+
+Message:
+${msg}
+`;
+        const html = `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;">
+  <div style="background:#FFB070;color:#3E2418;padding:14px 18px;border-radius:8px 8px 0 0;font-weight:bold;">📨 New portfolio enquiry</div>
+  <div style="padding:18px;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tr><td style="padding:6px 0;color:#888;width:90px;">Name</td><td><b>${escapeHtml(name || '(not given)')}</b></td></tr>
+      <tr><td style="padding:6px 0;color:#888;">Email</td><td><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
+      <tr><td style="padding:6px 0;color:#888;">Type</td><td>${escapeHtml(kind)}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;vertical-align:top;">Message</td><td style="white-space:pre-wrap;">${escapeHtml(msg)}</td></tr>
+      <tr><td style="padding:6px 0;color:#888;font-size:11px;">IP</td><td style="font-size:11px;color:#666;">${escapeHtml(ip)}</td></tr>
+    </table>
+  </div>
+</div>`;
+        // Send (or log if no SMTP configured)
+        if (mailTransporter) {
+          await mailTransporter.sendMail({
+            from: `"Portfolio Form" <${GMAIL_USER}>`,
+            replyTo: email,
+            to: CONTACT_TO,
+            subject, text, html,
+          });
+          console.log('[contact] email sent to', CONTACT_TO, 'for', email);
+        } else {
+          console.log('[contact] DEV-MODE submission (no SMTP):\n', text);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        console.error('[contact] error:', e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Server error: ' + e.message }));
+      }
+    });
+    return;
+  }
+
+  // ─── /api/observability GET — live server metrics for the Observability Tower dashboard ───
+  if (req.url === '/api/observability' && req.method === 'GET') {
+    const mem = process.memoryUsage();
+    const now = Date.now();
+    // Requests per second over the last 60s
+    const rps60 = obsState.recent.length / 60;
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({
+      uptimeSec: Math.floor((now - obsState.startTime) / 1000),
+      totalRequests: obsState.totalRequests,
+      apiRequests: obsState.apiRequests,
+      chatRequests: obsState.chatRequests,
+      visitRequests: obsState.visitRequests,
+      rps60,
+      heapUsedMB: +(mem.heapUsed / 1024 / 1024).toFixed(2),
+      heapTotalMB: +(mem.heapTotal / 1024 / 1024).toFixed(2),
+      rssMB: +(mem.rss / 1024 / 1024).toFixed(2),
+      nodeVersion: process.version,
+      platform: process.platform,
+      visits: { total: visitData.total, unique: visitData.unique },
+      // Sparkline: requests-per-second binned into 30 buckets of 2 sec each
+      sparkline: (function () {
+        const bins = new Array(30).fill(0);
+        const binMs = 2000;
+        for (const r of obsState.recent) {
+          const idx = Math.floor((now - r.ts) / binMs);
+          if (idx >= 0 && idx < 30) bins[29 - idx]++;
+        }
+        return bins;
+      })(),
+    }));
+    return;
   }
 
   // ─── /api/visit POST — record a visit (called by client on first page load) ───

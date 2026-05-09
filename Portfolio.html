@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Caveat:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="world.css?v=18"/>
+<link rel="stylesheet" href="world.css?v=24"/>
+<!-- hCaptcha widget — used by booking + hire forms. Sitekey injected per-form via /api/config. -->
+<script src="https://js.hcaptcha.com/1/api.js" async defer></script>
 </head>
 <body>
 
@@ -101,7 +103,11 @@
     </div>
     <div class="btn-row">
       <button class="btn-act btn-reset" data-act="reset" title="reset (R)">↺</button>
-      <button class="btn-act btn-action" data-act="interact" title="interact (E)">E</button>
+      <button class="btn-act btn-action" data-act="interact" title="info / interact (E)">E</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-act btn-board" data-act="board" title="board balloon (B)">B</button>
+      <button class="btn-act btn-enter" data-act="enter" title="get in car (Q)">Q</button>
     </div>
     <div class="btn-row">
       <button class="btn-act btn-jump" data-act="jump" title="run">⚡</button>
@@ -112,6 +118,20 @@
 <!-- HUD continued (these were originally inside .hud before my refactor) -->
 <div class="hud-rest" id="hudRest" style="display:none;">
   <div class="toast" id="toast"></div>
+  <!-- Visitor Tower banner (replaces the 3D scoreboard meshes that were colliding inside the obelisk) -->
+  <div class="visitor-banner" id="visitorBanner">
+    <div class="vb-count">
+      <div class="vb-num" id="vbCount">0</div>
+      <div class="vb-label">total visits</div>
+    </div>
+    <div class="vb-uniq">
+      <span id="vbUniq">0</span> unique
+    </div>
+    <div class="vb-ticker-wrap">
+      <div class="vb-ticker" id="vbTicker"><div>· LIVE GUESTBOOK · waiting for first visit ·</div></div>
+    </div>
+  </div>
+
   <!-- Cinematic intro overlay (shows during the 6-sec fly-over) -->
   <div class="cinematic-overlay" id="cinematicOverlay">
     <div class="cinematic-title">
@@ -189,7 +209,7 @@ const ld = setInterval(() => {
 }, 80);
 </script>
 
-<script src="world.js?v=51"></script>
+<script src="world.js?v=64"></script>
 
 <script>
 // Start handler
@@ -504,6 +524,29 @@ function showToast(msg) {
 // Expose globally so world.js can pop toasts directly (walk-mode toggles, ride-mode entry, etc.)
 window.__imranToast = showToast;
 
+// Visitor banner — driven by the Visitor Tower's drawTowerScreen() / drawTowerTicker() in world.js
+const vbCountEl = document.getElementById('vbCount');
+const vbUniqEl = document.getElementById('vbUniq');
+const vbTickerEl = document.getElementById('vbTicker');
+const visitorBannerEl = document.getElementById('visitorBanner');
+window.__updateVisitorBanner = function (data) {
+  if (!vbCountEl) return;
+  const fmt = String(data.total).padStart(5, '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  vbCountEl.textContent = fmt;
+  vbUniqEl.textContent = data.unique.toLocaleString();
+  if (data.plusOne && visitorBannerEl) {
+    visitorBannerEl.classList.add('plus-one');
+    setTimeout(() => visitorBannerEl.classList.remove('plus-one'), 800);
+  }
+};
+window.__updateVisitorTicker = function (lines) {
+  if (!vbTickerEl || !lines || !lines.length) return;
+  // Render once per second to avoid layout thrash; the marquee animation handles the scroll
+  const joined = lines.join('   ·   ');
+  if (vbTickerEl.firstChild && vbTickerEl.firstChild.textContent === joined) return;
+  vbTickerEl.innerHTML = `<div>${joined}   ·   ${joined}</div>`;
+};
+
 const zonePhoto = document.getElementById('zonePhoto');
 function setPhoto(src) {
   if (src) { zonePhoto.src = src; zonePhoto.hidden = false; }
@@ -582,13 +625,32 @@ function showPanel(z) {
   } else if (z.key === 'cloud_demo') {
     activeInteractUrl = '__cloud__';
     activeInteractLabel = 'Cloud Security Demo';
-    showInteractPrompt(`☁️ <span class="pink">CLOUD SECURITY</span> — press <kbd>E</kbd> to see how an S3 bucket leaks`);
+    // At the balloon station — show BOTH controls so the player knows about info AND ride
+    showInteractPrompt(`☁️ <span class="pink">BALLOON STATION</span> · <kbd>E</kbd> how I lock down cloud · <kbd>B</kbd> board a balloon`);
   } else if (z.key === 'vpn_demo') {
     activeInteractUrl = '__vpn__';
     activeInteractLabel = 'VPN / TLS Demo';
-    showInteractPrompt(`🔒 <span class="pink">VPN TUNNEL</span> — press <kbd>E</kbd> to see how the cable car explains TLS`);
+    // At the cable car station — both controls
+    showInteractPrompt(`🔒 <span class="pink">CABLE CAR STATION</span> · <kbd>E</kbd> how I deploy TLS · <kbd>T</kbd> ride to the peak`);
   } else if (z.key === 'balloon_ride_pad') {
-    showInteractPrompt(`🎈 <span class="pink">BALLOON RIDE</span> — press <kbd>E</kbd> to take off · <kbd>M</kbd> to land`);
+    // Specific balloon — same combined hint
+    showInteractPrompt(`🎈 <span class="pink">BALLOON</span> · <kbd>B</kbd> board · <kbd>E</kbd> cloud demo · <kbd>M</kbd> land`);
+  } else if (z.key === 'observability') {
+    activeInteractUrl = '__obs__';
+    activeInteractLabel = 'Live Observability Tower';
+    showInteractPrompt(`📊 <span class="pink">LIVE OBSERVABILITY</span> — press <kbd>E</kbd> for real metrics from this server`);
+  } else if (z.key === 'resume_drop') {
+    activeInteractUrl = '__resume__';
+    activeInteractLabel = 'Resume';
+    showInteractPrompt(`📄 <span class="pink">RESUME</span> — press <kbd>E</kbd> to download my CV`);
+  } else if (z.key === 'book_call') {
+    activeInteractUrl = '__book__';
+    activeInteractLabel = 'Book a Call';
+    showInteractPrompt(`📅 <span class="pink">BOOK A CALL</span> — press <kbd>E</kbd> to schedule a 30-min intro`);
+  } else if (z.key === 'hire_packages') {
+    activeInteractUrl = '__packages__';
+    activeInteractLabel = 'Hire Packages';
+    showInteractPrompt(`💼 <span class="pink">HIRE PACKAGES</span> — press <kbd>E</kbd> to see audit / project / retainer pricing`);
   }
 }
 window.addEventListener('imran:zone', (e) => showPanel(e.detail));
@@ -637,6 +699,22 @@ window.addEventListener('imran:interact', () => {
     showVpnDemo();
     return;
   }
+  if (activeInteractUrl === '__obs__') {
+    showObservabilityDemo();
+    return;
+  }
+  if (activeInteractUrl === '__resume__') {
+    showResumeDownload();
+    return;
+  }
+  if (activeInteractUrl === '__book__') {
+    showBookCall();
+    return;
+  }
+  if (activeInteractUrl === '__packages__') {
+    showHirePackages();
+    return;
+  }
   window.open(activeInteractUrl, '_blank');
   showToast(`✨ opening <span class="pink">${activeInteractLabel}</span>`);
 });
@@ -649,18 +727,36 @@ function showSqliDemo() {
     m.id = 'sqliModal';
     m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:rgba(10,16,8,0.97);border:2px solid #9fef00;border-radius:14px;padding:24px 28px;color:#9fef00;font-family:"JetBrains Mono",monospace;min-width:380px;max-width:90vw;box-shadow:0 0 60px rgba(159,239,0,0.4);';
     m.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2 style="font-family:'Permanent Marker',cursive;color:#9fef00;font-size:22px;">💉 SQL Injection Demo</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h2 style="font-family:'Permanent Marker',cursive;color:#9fef00;font-size:20px;">💉 How SQL injection steals data — and how I stop it.</h2>
         <button id="sqliClose" style="background:none;border:none;color:#9fef00;font-size:22px;cursor:pointer;">×</button>
       </div>
-      <p style="margin-bottom:12px;font-size:13px;color:#cfffaa;">The query below is built by string concatenation (BAD). Try entering<br><code style="color:#ffe066;">admin' OR '1'='1</code> in the username field.</p>
-      <pre style="background:#001100;padding:10px;border-radius:6px;font-size:11px;color:#9fef00;overflow:auto;">SELECT * FROM users WHERE username='&lt;input&gt;' AND password='&lt;input&gt;'</pre>
-      <div style="margin:14px 0;display:flex;flex-direction:column;gap:8px;">
-        <input id="sqliUser" placeholder="username" autocomplete="off" style="padding:10px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
-        <input id="sqliPass" type="password" placeholder="password" autocomplete="off" style="padding:10px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
-        <button id="sqliLogin" style="padding:10px;background:#9fef00;border:none;color:#001100;border-radius:6px;cursor:pointer;font-family:'Permanent Marker',cursive;font-size:15px;">attempt login</button>
+      <p style="margin-bottom:10px;font-size:12px;color:#cfffaa;">String-concat SQL is the #1 backend bug I find in production code reviews. Try entering <code style="color:#ffe066;">admin' OR '1'='1</code> below to bypass auth, then read what I deploy to make this impossible ↓</p>
+      <pre style="background:#001100;padding:8px;border-radius:6px;font-size:11px;color:#9fef00;overflow:auto;">SELECT * FROM users WHERE username='&lt;input&gt;' AND password='&lt;input&gt;'</pre>
+      <div style="margin:10px 0;display:flex;flex-direction:column;gap:6px;">
+        <input id="sqliUser" placeholder="username" autocomplete="off" style="padding:8px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
+        <input id="sqliPass" type="password" placeholder="password" autocomplete="off" style="padding:8px;background:#001a00;border:1px solid #5a7a3a;color:#9fef00;border-radius:6px;font-family:inherit;">
+        <button id="sqliLogin" style="padding:9px;background:#9fef00;border:none;color:#001100;border-radius:6px;cursor:pointer;font-family:'Permanent Marker',cursive;font-size:14px;">attempt login</button>
       </div>
-      <div id="sqliResult" style="min-height:60px;font-size:12px;line-height:1.5;"></div>
+      <div id="sqliResult" style="min-height:30px;font-size:12px;line-height:1.5;margin-bottom:12px;"></div>
+      <!-- Always-visible protection panel — same layout as the other demos -->
+      <div style="padding:12px;background:#001a00;border-left:3px solid #9fef00;border-radius:4px;">
+        <div style="color:#9fef00;font-weight:bold;font-size:13px;">🛡 What I deploy for organizations to phishing-proof the backend:</div>
+        <ul style="font-size:11px;color:#cfffaa;line-height:1.7;padding-left:18px;margin-top:6px;">
+          <li>Code audit of every DB query — find string-concat SQL, ORM leaks, NoSQL injection</li>
+          <li>Migrate to parameterized queries / prepared statements (example below)</li>
+          <li>SAST step in CI (Semgrep / CodeQL) — injection bugs break the build, not prod</li>
+          <li>Bcrypt + Argon2id for password storage with proper cost factors</li>
+          <li>Rate-limit login endpoints — slow credential-stuffing attacks</li>
+          <li>WAF rules (Cloudflare / AWS WAF) as a second line of defense</li>
+        </ul>
+        <pre style="background:#001100;padding:6px;border-radius:4px;color:#9fef00;font-size:10px;margin-top:8px;">db.query('SELECT * FROM users WHERE username=? AND password=?',\n         [username, password])</pre>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+        <a href="mailto:imranpasha.ahmed@gmail.com?subject=Backend%20security%20audit" style="display:inline-block;padding:7px 14px;background:#9fef00;color:#001100;text-decoration:none;border-radius:5px;font-weight:bold;font-size:11px;">📧 Hire me — code audit</a>
+        <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank" style="display:inline-block;padding:7px 14px;background:transparent;color:#5ce5ff;border:1px solid #5ce5ff;text-decoration:none;border-radius:5px;font-size:11px;">LinkedIn</a>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:#7a8870;">Background: MERN, GraphQL, Node, Burp Suite — I write the backend AND I attack it.</div>
     `;
     document.body.appendChild(m);
     m.querySelector('#sqliClose').addEventListener('click', () => m.remove());
@@ -670,13 +766,11 @@ function showSqliDemo() {
       const r = m.querySelector('#sqliResult');
       const isInjected = /['"\\]|or\s+['"]?\d+['"]?\s*=\s*['"]?\d+/i.test(u + p);
       if (isInjected) {
-        r.innerHTML = `<div style="color:#ff8a6e;font-weight:bold;">🔓 AUTH BYPASSED!</div>
-        <div style="margin-top:8px;color:#cfffaa;">Your input made the query become:</div>
-        <pre style="background:#001100;padding:8px;border-radius:6px;color:#ffe066;font-size:11px;margin-top:6px;">SELECT * FROM users WHERE username='${u}' AND password='${p}'</pre>
-        <div style="margin-top:12px;color:#cfffaa;">✅ <b>Safe version</b> uses parameterized queries:</div>
-        <pre style="background:#001100;padding:8px;border-radius:6px;color:#9fef00;font-size:11px;margin-top:6px;">db.query('SELECT * FROM users WHERE username=? AND password=?',\n         [username, password])</pre>`;
+        r.innerHTML = `<div style="color:#ff8a6e;font-weight:bold;font-size:13px;">🔓 AUTH BYPASSED — exact bug I find in real codebases.</div>
+        <div style="margin-top:6px;color:#cfffaa;font-size:11px;">Your input made the query become:</div>
+        <pre style="background:#001100;padding:6px;border-radius:6px;color:#ffe066;font-size:10px;margin-top:4px;white-space:pre-wrap;">SELECT * FROM users WHERE username='${u}' AND password='${p}'</pre>`;
       } else {
-        r.innerHTML = `<div style="color:#5ce5ff;">login failed for "${u}". Try the classic <code style="color:#ffe066;">admin' OR '1'='1</code> trick →</div>`;
+        r.innerHTML = `<div style="color:#5ce5ff;font-size:11px;">login failed for "${u}". Try the classic <code style="color:#ffe066;">admin' OR '1'='1</code> trick →</div>`;
       }
     });
   } else {
@@ -696,7 +790,10 @@ function showPhishingDemo() {
         <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">🏦</span><b>SecureBank Online — Sign In</b></div>
         <button id="phishClose" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;">×</button>
       </div>
-      <div style="padding:20px 22px;background:#f4f6fa;font-size:13px;color:#555;border-bottom:1px solid #ddd;">
+      <div style="padding:12px 22px;background:#fff8e6;font-size:11px;color:#7a4a00;border-bottom:1px solid #e0c878;line-height:1.5;">
+        🎣 <b>Live phishing demo</b> — this is the EXACT page that steals 80% of corporate credentials. Try the form below to see how it works, then read the protection plan I deploy for organizations ↓
+      </div>
+      <div style="padding:14px 22px;background:#f4f6fa;font-size:13px;color:#555;border-bottom:1px solid #ddd;">
         ⚠ <b>Urgent:</b> we detected unusual activity. Please re-verify your credentials to keep your account active.
       </div>
       <div style="padding:22px;">
@@ -711,28 +808,48 @@ function showPhishingDemo() {
         <button id="phishLogin" style="width:100%;padding:11px;background:#1a3a8c;border:none;color:#fff;border-radius:6px;cursor:pointer;font-size:15px;font-weight:bold;">Sign In</button>
         <div style="font-size:11px;color:#888;margin-top:14px;text-align:center;">securebank.com · TLS 1.3 · Verified by VeriSign</div>
       </div>
-      <div id="phishReveal" style="display:none;background:#1a0a08;color:#ff8a6e;padding:22px;border-top:3px solid #ff6a3a;">
-        <h3 style="margin:0 0 10px 0;font-family:'Permanent Marker',cursive;font-size:20px;">🎣 YOU JUST GOT PHISHED.</h3>
-        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;">
-          That site looked like your bank. The URL was <code style="color:#ffe066;">securebank-login.example.com</code> — not the real <code>securebank.com</code>. Your credentials just went to <b>my server</b>.
+      <div id="phishReveal" style="background:#1a0a08;color:#ff8a6e;padding:22px;border-top:3px solid #ff6a3a;">
+        <h3 style="margin:0 0 10px 0;font-family:'Permanent Marker',cursive;font-size:18px;">🎣 How credentials get stolen — and how I stop it.</h3>
+        <p style="font-size:12px;line-height:1.6;color:#ffd2c0;">
+          That fake URL would be <code style="color:#ffe066;">securebank-login.example.com</code> — not <code>securebank.com</code>. <b>One look-alike domain + an "urgent" tone steals 80% of corporate credentials.</b> Try the form above to see it; the page above is exactly what a phishing kit puts in front of your employees.
         </p>
-        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;margin-top:10px;"><b>Red flags you missed:</b></p>
-        <ul style="font-size:12px;color:#ffd2c0;line-height:1.7;padding-left:18px;">
-          <li>Urgent-sounding "unusual activity" tone</li>
-          <li>Look-alike domain (one extra word in the URL)</li>
-          <li>No 2FA or device-recognition step</li>
-          <li>Real banks never email you a one-click login link</li>
-        </ul>
-        <p style="font-size:13px;line-height:1.6;color:#ffd2c0;margin-top:10px;">
-          <b>How I defend against this in real apps:</b> WebAuthn / passkeys (no shared password), email-link verification with anti-replay tokens, DMARC + SPF on the email side.
-        </p>
-        <button id="phishOk" style="margin-top:14px;padding:9px 18px;background:#ff6a3a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Got it — close</button>
+        <div style="margin-top:12px;padding:10px;background:#28140a;border-left:3px solid #ff8a6e;border-radius:4px;">
+          <div style="color:#ff8a6e;font-weight:bold;font-size:12px;">⚠ The 4 red flags employees miss:</div>
+          <ul style="font-size:11px;color:#ffd2c0;line-height:1.6;padding-left:18px;margin-top:4px;">
+            <li>Urgent / fear language ("unusual activity", "account will close")</li>
+            <li>Look-alike domain — one extra word or hyphen</li>
+            <li>No 2FA / device-recognition step in the flow</li>
+            <li>Real banks NEVER email a one-click login link</li>
+          </ul>
+        </div>
+        <div style="margin-top:12px;padding:12px;background:#0a2418;border-left:3px solid #9fef00;border-radius:4px;">
+          <div style="color:#9fef00;font-weight:bold;font-size:13px;">🛡 What I deploy in your organization to block this:</div>
+          <ul style="font-size:11px;color:#cfffaa;line-height:1.7;padding-left:18px;margin-top:6px;">
+            <li>Migrate password login → <b>WebAuthn / passkeys</b> — phishing-resistant by design (no shared secret to steal)</li>
+            <li>Implement device-recognition + risk-based step-up auth (challenge unknown devices)</li>
+            <li>Set up <b>DMARC + SPF + DKIM</b> on your domain so attackers can't spoof your email</li>
+            <li>Internal phishing simulation campaigns + employee training material</li>
+            <li>Code-review login flows for OAuth confused-deputy bugs, open redirects, CSRF</li>
+            <li>Incident-response playbook for credential-leak detection + forced password rotation</li>
+          </ul>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="mailto:imranpasha.ahmed@gmail.com?subject=Auth%20%2F%20phishing-resistance%20review" style="display:inline-block;padding:8px 16px;background:#ff6a3a;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;font-size:12px;">📧 Hire me — auth review</a>
+          <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank" style="display:inline-block;padding:8px 16px;background:transparent;color:#ffd2c0;border:1px solid #ffd2c0;text-decoration:none;border-radius:5px;font-size:12px;">LinkedIn</a>
+          <button id="phishOk" style="padding:8px 16px;background:transparent;color:#ffd2c0;border:1px solid #ffd2c0;border-radius:5px;cursor:pointer;font-size:12px;">close</button>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:#a89888;">Background: full-stack engineer (MERN, GraphQL) · cybersec specialist · OWASP Top 10 · I build the apps AND I break them</div>
       </div>
     `;
     document.body.appendChild(m);
     m.querySelector('#phishClose').addEventListener('click', () => m.remove());
+    // Clicking the fake "Sign In" highlights the protection panel briefly so the user
+    // physically experiences "I just gave away my password" then sees how I prevent it.
     m.querySelector('#phishLogin').addEventListener('click', () => {
-      m.querySelector('#phishReveal').style.display = 'block';
+      const reveal = m.querySelector('#phishReveal');
+      reveal.style.boxShadow = '0 0 30px rgba(255, 138, 110, 0.8)';
+      reveal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => { reveal.style.boxShadow = ''; }, 1200);
     });
     m.querySelector('#phishOk').addEventListener('click', () => m.remove());
   } else {
@@ -756,17 +873,24 @@ function showPortScanDemo() {
         <div style="color:#9ce6ff;margin-bottom:10px;">An airport has gates 1, 2, 3. A server has ports 22, 80, 443. <b>nmap</b> is how I check which gates have flights.</div>
         <pre id="portScanOutput" style="background:#001019;border:1px solid #2a3848;padding:12px;border-radius:6px;color:#9ce6ff;font-size:12px;line-height:1.55;margin:0;overflow:auto;white-space:pre;">$ nmap -sV target.io
 Starting Nmap scan...</pre>
-        <button id="portScanReveal" style="margin-top:14px;padding:9px 18px;background:#5ce5ff;color:#001019;border:none;border-radius:6px;cursor:pointer;font-family:'Permanent Marker',cursive;font-size:14px;">show what's exposed →</button>
-        <div id="portScanResult" style="display:none;margin-top:14px;color:#ffd2c0;font-size:13px;line-height:1.65;">
-          <div style="color:#ff8a6e;font-weight:bold;font-size:16px;margin-bottom:8px;">⚠ Found 4 open ports — one of them shouldn't be public.</div>
-          <p>Port 8080 is the debug interface. If your server is reachable on 0.0.0.0, an attacker doesn't even need to guess — they just scan.</p>
-          <p style="margin-top:10px;color:#cfffaa;"><b>How I defend:</b></p>
-          <ul style="padding-left:18px;color:#cfffaa;line-height:1.7;font-size:12px;">
-            <li>Cloud security group: only 22/80/443 open to 0.0.0.0/0</li>
-            <li><code style="color:#ffe066;">fail2ban</code> bans IPs after failed SSH attempts</li>
-            <li>Admin endpoints require WireGuard / Tailscale (not public)</li>
-            <li>Caddy runs as the only public listener; backend on internal Docker network</li>
-          </ul>
+        <div id="portScanResult" style="margin-top:14px;color:#ffd2c0;font-size:13px;line-height:1.65;">
+          <div style="color:#ff8a6e;font-weight:bold;font-size:16px;margin-bottom:8px;">⚠ Found 4 open ports — one shouldn't be public.</div>
+          <p style="font-size:12px;">An attacker doesn't guess — they scan. Port 8080 is a debug interface bleeding into prod. I find these in pentests for clients.</p>
+          <div style="margin-top:14px;padding:12px;background:#001a14;border-left:3px solid #9fef00;border-radius:4px;">
+            <div style="color:#9fef00;font-weight:bold;font-size:13px;">🛡 Hire me to harden your infra:</div>
+            <ul style="padding-left:18px;color:#cfffaa;line-height:1.7;font-size:11px;margin-top:6px;">
+              <li>Black-box pentest of your public surface (nmap, Burp, Metasploit)</li>
+              <li>Lock down cloud security groups + harden SSH (fail2ban, key-only, port knocking)</li>
+              <li>Move admin endpoints behind WireGuard / Tailscale — invisible to scanners</li>
+              <li>Deploy Caddy as a single public TLS listener with backend on private Docker network (this very site is set up that way)</li>
+              <li>Continuous monitoring: pipe nmap diffs into CI so new exposed ports break the build</li>
+            </ul>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="mailto:imranpasha.ahmed@gmail.com?subject=Security%20audit%20enquiry" style="display:inline-block;padding:8px 16px;background:#9fef00;color:#001100;text-decoration:none;border-radius:5px;font-weight:bold;font-size:12px;">📧 Hire me — security audit</a>
+            <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank" style="display:inline-block;padding:8px 16px;background:transparent;color:#5ce5ff;border:1px solid #5ce5ff;text-decoration:none;border-radius:5px;font-size:12px;">LinkedIn</a>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:#7d8590;">Background: TryHackMe top 15% (49 rooms · 9 badges · @devilhost666) · Burp Suite · OWASP Top 10 · Linux internals</div>
         </div>
       </div>
     `;
@@ -792,9 +916,6 @@ Starting Nmap scan...</pre>
       i++;
       if (i >= lines.length) clearInterval(interval);
     }, 220);
-    m.querySelector('#portScanReveal').addEventListener('click', () => {
-      m.querySelector('#portScanResult').style.display = 'block';
-    });
   } else {
     m.style.display = 'block';
   }
@@ -834,25 +955,30 @@ function showCloudDemo() {
             <tr><td style="padding:7px 10px;border-bottom:1px solid #eee;">📄 user-emails.csv</td><td style="padding:7px 10px;border-bottom:1px solid #eee;">2.4 MB</td><td style="padding:7px 10px;border-bottom:1px solid #eee;color:#d13212;">Public</td></tr>
           </tbody>
         </table>
-        <button id="cloudReveal" style="margin-top:14px;padding:9px 18px;background:#ff9900;color:#000;border:none;border-radius:5px;cursor:pointer;font-weight:bold;font-size:13px;">how this happens →</button>
-        <div id="cloudResult" style="display:none;margin-top:14px;background:#1a0a08;color:#ffd2c0;padding:14px;border-radius:6px;font-size:13px;line-height:1.7;">
-          <div style="color:#ff8a6e;font-weight:bold;font-size:15px;margin-bottom:6px;">☁️ This is the most common cloud breach.</div>
-          <p>A developer makes a bucket public for testing, ships, forgets to lock it down. <code style="color:#ffe066;">git secrets</code> finds nothing because the leak isn't in code — it's in the cloud config.</p>
-          <p style="margin-top:8px;"><b>How I defend:</b></p>
-          <ul style="padding-left:18px;line-height:1.7;font-size:12px;">
-            <li>S3 Block Public Access at the account level — turns "public" into a fail-closed setting</li>
-            <li>Least-privilege IAM — buckets default-deny, services granted explicit GetObject only on needed prefixes</li>
-            <li>Presigned URLs with short TTL for actual public sharing</li>
-            <li>CloudTrail + automated alerts on bucket-policy changes</li>
-          </ul>
+        <div id="cloudResult" style="margin-top:14px;background:#1a0a08;color:#ffd2c0;padding:14px;border-radius:6px;font-size:13px;line-height:1.7;">
+          <div style="color:#ff8a6e;font-weight:bold;font-size:15px;margin-bottom:6px;">☁️ The #1 cloud breach pattern — and what I do about it.</div>
+          <p style="font-size:12px;">A dev opens a bucket for testing, ships, forgets. Git secret-scanners find nothing because the leak isn't in code — it's in the cloud config. I audit cloud setups for exactly this.</p>
+          <div style="margin-top:12px;padding:12px;background:#001833;border-left:3px solid #ff9900;border-radius:4px;">
+            <div style="color:#ff9900;font-weight:bold;font-size:13px;">☁ Hire me to audit your cloud:</div>
+            <ul style="padding-left:18px;line-height:1.7;font-size:11px;margin-top:6px;">
+              <li>Full IAM review — buckets, roles, service principals — find every over-privileged grant</li>
+              <li>Enable S3 Block Public Access at the account level — fail-closed by default</li>
+              <li>Replace public-bucket sharing with presigned URLs (short TTL, audit-logged)</li>
+              <li>CloudTrail + automated alerts on policy changes — Slack ping the moment a bucket goes public</li>
+              <li>Secrets out of code → AWS Secrets Manager / SSM Parameter Store with rotation</li>
+              <li>Infrastructure-as-Code (Terraform) reviewed in PRs so misconfigs can't ship</li>
+            </ul>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <a href="mailto:imranpasha.ahmed@gmail.com?subject=Cloud%20security%20audit" style="display:inline-block;padding:8px 16px;background:#ff9900;color:#000;text-decoration:none;border-radius:5px;font-weight:bold;font-size:12px;">📧 Hire me — cloud audit</a>
+            <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank" style="display:inline-block;padding:8px 16px;background:transparent;color:#79c0ff;border:1px solid #79c0ff;text-decoration:none;border-radius:5px;font-size:12px;">LinkedIn</a>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:#a89888;">Background: full-stack engineer (MERN, GraphQL) deployed to EC2, Docker, GitHub Actions CI/CD · cybersec specialist</div>
         </div>
       </div>
     `;
     document.body.appendChild(m);
     m.querySelector('#cloudClose').addEventListener('click', () => m.remove());
-    m.querySelector('#cloudReveal').addEventListener('click', () => {
-      m.querySelector('#cloudResult').style.display = 'block';
-    });
   } else {
     m.style.display = 'block';
   }
@@ -884,17 +1010,22 @@ function showVpnDemo() {
             <div style="margin-top:8px;font-size:11px;color:#90c090;">Encrypted + authenticated + integrity-checked.</div>
           </div>
         </div>
-        <div style="margin-top:16px;font-size:12px;line-height:1.7;color:#9ce6ff;">
-          <b>What actually happens during the handshake:</b>
-          <ul style="padding-left:18px;margin-top:6px;color:#bcd6ee;">
-            <li>Server proves it's the real server with a certificate (signed by a trusted CA)</li>
-            <li>Both sides agree on a fresh symmetric key — never sent over the wire</li>
-            <li>Perfect-forward-secrecy: even if the long-term key leaks tomorrow, today's traffic stays safe</li>
-            <li>Every byte after that is encrypted + authenticated + tamper-evident</li>
+        <div style="margin-top:14px;padding:12px;background:#0a2438;border-left:3px solid #5ce5ff;border-radius:4px;">
+          <div style="color:#5ce5ff;font-weight:bold;font-size:13px;">🔒 What I deploy for production:</div>
+          <ul style="padding-left:18px;margin-top:6px;color:#bcd6ee;line-height:1.7;font-size:11px;">
+            <li>Caddy reverse proxy with auto-Let's Encrypt — this site is set up that way (zero-config HTTPS)</li>
+            <li>HSTS preload + secure cookies + CSP headers configured per app</li>
+            <li>WireGuard meshes for backend ↔ backend traffic (mutual TLS for service-to-service)</li>
+            <li>Session token storage that meets compliance reqs (httpOnly, SameSite=Strict, rotation on auth)</li>
+            <li>Cert renewal monitoring + alerts so nothing expires silently</li>
           </ul>
         </div>
-        <p style="font-size:12px;color:#9ce6ff;margin-top:12px;line-height:1.6;">This site uses <b>Caddy</b> as the reverse proxy — it auto-fetches a Let's Encrypt cert and renews it. Zero config, no hand-rolled OpenSSL. That's why you see <code style="color:#ffe066;">https://</code> with no warning.</p>
-        <button id="vpnOk" style="margin-top:14px;padding:9px 18px;background:#5ce5ff;color:#0a1426;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;">got it</button>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <a href="mailto:imranpasha.ahmed@gmail.com?subject=TLS%20%2F%20infra%20review" style="display:inline-block;padding:8px 16px;background:#5ce5ff;color:#0a1426;text-decoration:none;border-radius:5px;font-weight:bold;font-size:12px;">📧 Hire me — TLS / infra setup</a>
+          <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank" style="display:inline-block;padding:8px 16px;background:transparent;color:#9ce6ff;border:1px solid #9ce6ff;text-decoration:none;border-radius:5px;font-size:12px;">LinkedIn</a>
+          <button id="vpnOk" style="padding:8px 16px;background:transparent;color:#9ce6ff;border:1px solid #9ce6ff;border-radius:5px;cursor:pointer;font-size:12px;">close</button>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:#7d8590;">This portfolio runs on Caddy + Docker + GitHub Actions CI/CD on EC2. Everything you see is deployed by me.</div>
       </div>
     `;
     document.body.appendChild(m);
@@ -903,6 +1034,425 @@ function showVpnDemo() {
   } else {
     m.style.display = 'block';
   }
+}
+
+// Live Observability Tower dashboard — Grafana-style modal that polls /api/observability every 2s.
+// Real metrics from THIS server: uptime, requests, memory, visits + a 60-sec sparkline of RPS.
+function showObservabilityDemo() {
+  let m = document.getElementById('obsModal');
+  let pollInterval = null;
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'obsModal';
+    m.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0;color:#c9d1d9;font-family:"JetBrains Mono",ui-monospace,monospace;min-width:640px;max-width:96vw;box-shadow:0 0 80px rgba(0,0,0,0.6),0 0 40px rgba(255,107,71,0.2);overflow:hidden;';
+    m.innerHTML = `
+      <div style="background:#0d1117;color:#c9d1d9;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30363d;">
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+          <span style="background:#ff6b47;color:#fff;padding:2px 6px;border-radius:3px;font-weight:bold;font-size:11px;">📊 GRAFANA</span>
+          <b style="color:#c9d1d9;">imran-portfolio · live observability</b>
+          <span id="obsLiveDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00ff66;box-shadow:0 0 8px #00ff66;animation:obsBlink 1s infinite;"></span>
+          <span style="color:#7d8590;font-size:11px;">Auto-refresh 2s</span>
+        </div>
+        <button id="obsClose" style="background:none;border:none;color:#8b949e;font-size:22px;cursor:pointer;">×</button>
+      </div>
+      <style>@keyframes obsBlink { 50% { opacity: 0.3; } }</style>
+      <div style="padding:14px 18px;font-size:12px;">
+        <div style="color:#8b949e;font-size:11px;margin-bottom:10px;">Live metrics scraped from <code style="color:#79c0ff;">/api/observability</code> on the very Node server hosting this 3D portfolio. Drive into the tower → see the ops underneath the experience you're using.</div>
+        <!-- 4 KPI cards -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Uptime</div>
+            <div id="obsUptime" style="color:#7ee787;font-size:20px;font-weight:bold;margin-top:4px;">—</div>
+          </div>
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Total Requests</div>
+            <div id="obsTotalReq" style="color:#79c0ff;font-size:20px;font-weight:bold;margin-top:4px;">—</div>
+          </div>
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Heap Used</div>
+            <div id="obsHeap" style="color:#ffa657;font-size:20px;font-weight:bold;margin-top:4px;">—</div>
+          </div>
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">RPS (60s avg)</div>
+            <div id="obsRps" style="color:#d2a8ff;font-size:20px;font-weight:bold;margin-top:4px;">—</div>
+          </div>
+        </div>
+        <!-- Sparkline panel -->
+        <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;margin-bottom:12px;">
+          <div style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Requests / sec — last 60s</div>
+          <canvas id="obsSpark" width="600" height="80" style="width:100%;height:80px;display:block;"></canvas>
+        </div>
+        <!-- Detailed metrics rows -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;margin-bottom:6px;">Visits</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Total</span><span id="obsVisitsTotal" style="color:#7ee787;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Unique</span><span id="obsVisitsUniq" style="color:#7ee787;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Visit pings</span><span id="obsVisitReq" style="color:#79c0ff;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Chat (Gemini) calls</span><span id="obsChatReq" style="color:#79c0ff;">—</span>
+            </div>
+          </div>
+          <div style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;">
+            <div style="color:#8b949e;font-size:10px;text-transform:uppercase;margin-bottom:6px;">System</div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Heap total</span><span id="obsHeapTotal" style="color:#ffa657;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>RSS</span><span id="obsRss" style="color:#ffa657;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Node</span><span id="obsNode" style="color:#d2a8ff;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#c9d1d9;line-height:1.7;">
+              <span>Platform</span><span id="obsPlatform" style="color:#d2a8ff;">—</span>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:10px;color:#7d8590;text-align:right;">
+          source: <code style="color:#79c0ff;">GET /api/observability</code> · poll every 2 sec · stop polling when modal closes
+        </div>
+      </div>
+    `;
+    document.body.appendChild(m);
+    const close = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      m.remove();
+    };
+    m.querySelector('#obsClose').addEventListener('click', close);
+    // Sparkline renderer
+    const canvas = m.querySelector('#obsSpark');
+    const ctx = canvas.getContext('2d');
+    function drawSpark(bins) {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      // Grid lines
+      ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+      for (let y = 0; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      const max = Math.max(1, ...bins);
+      const stepX = W / bins.length;
+      // Filled area
+      ctx.fillStyle = 'rgba(126, 231, 135, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let i = 0; i < bins.length; i++) {
+        const x = i * stepX, y = H - (bins[i] / max) * (H - 6) - 3;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fill();
+      // Stroke line
+      ctx.strokeStyle = '#7ee787'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < bins.length; i++) {
+        const x = i * stepX, y = H - (bins[i] / max) * (H - 6) - 3;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    function fmtUptime(s) {
+      const h = Math.floor(s / 3600), mn = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (h > 0) return `${h}h ${mn}m`;
+      if (mn > 0) return `${mn}m ${sec}s`;
+      return `${sec}s`;
+    }
+    async function poll() {
+      try {
+        const res = await fetch('/api/observability', { cache: 'no-store' });
+        if (!res.ok) throw new Error('http ' + res.status);
+        const d = await res.json();
+        m.querySelector('#obsUptime').textContent = fmtUptime(d.uptimeSec);
+        m.querySelector('#obsTotalReq').textContent = d.totalRequests.toLocaleString();
+        m.querySelector('#obsHeap').textContent = d.heapUsedMB.toFixed(1) + ' MB';
+        m.querySelector('#obsRps').textContent = d.rps60.toFixed(2);
+        m.querySelector('#obsVisitsTotal').textContent = d.visits.total.toLocaleString();
+        m.querySelector('#obsVisitsUniq').textContent = d.visits.unique.toLocaleString();
+        m.querySelector('#obsVisitReq').textContent = d.visitRequests.toLocaleString();
+        m.querySelector('#obsChatReq').textContent = d.chatRequests.toLocaleString();
+        m.querySelector('#obsHeapTotal').textContent = d.heapTotalMB.toFixed(1) + ' MB';
+        m.querySelector('#obsRss').textContent = d.rssMB.toFixed(1) + ' MB';
+        m.querySelector('#obsNode').textContent = d.nodeVersion;
+        m.querySelector('#obsPlatform').textContent = d.platform;
+        drawSpark(d.sparkline || []);
+      } catch (e) {
+        console.warn('[obs] poll failed', e);
+      }
+    }
+    poll();
+    pollInterval = setInterval(poll, 2000);
+  } else {
+    m.style.display = 'block';
+  }
+}
+
+// ────────── HIRE-CONVERSION MODALS (Resume / Book a Call / Hire Packages / Sticky CTA) ──────────
+
+// POST a contact payload to our own /api/contact endpoint (Nodemailer + Gmail SMTP).
+// Returns { ok: true } on success, throws on error. The server validates hCaptcha + rate-limits.
+async function sendContactRequest(payload) {
+  const res = await fetch('/api/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('http ' + res.status));
+  return data;
+}
+
+// Show an inline status row (success / error / sending) inside a modal — appended below the submit button
+function setSendStatus(modal, kind, text) {
+  let s = modal.querySelector('.send-status');
+  if (!s) {
+    s = document.createElement('div');
+    s.className = 'send-status';
+    modal.querySelector('div[style*="padding:22px"]').appendChild(s);
+  }
+  s.style.cssText = 'margin-top:12px;padding:10px 14px;border-radius:6px;font-size:13px;line-height:1.5;text-align:center;';
+  if (kind === 'sending') {
+    s.style.cssText += 'background:#fef9f0;color:#7a4a00;border:1px solid #FFB070;';
+    s.innerHTML = '⏳ sending…';
+  } else if (kind === 'success') {
+    s.style.cssText += 'background:#e8f8e0;color:#1a5a10;border:1px solid #9fef00;';
+    s.innerHTML = '✅ <b>Message sent!</b> I\'ll reply within 24 hrs.';
+  } else {
+    s.style.cssText += 'background:#ffeae0;color:#7a2a00;border:1px solid #ff6a3a;';
+    s.innerHTML = '❌ ' + text + '. Or email <a href="mailto:imranpasha.ahmed@gmail.com">imranpasha.ahmed@gmail.com</a> directly.';
+  }
+}
+
+// hCaptcha sitekey — server reads HCAPTCHA_SITE_KEY env var and exposes via /api/config.
+// We fetch it once and inject hCaptcha widgets dynamically into forms.
+let _hcSiteKey = null;
+async function getHcSiteKey() {
+  if (_hcSiteKey !== null) return _hcSiteKey;
+  try {
+    const res = await fetch('/api/config');
+    const c = await res.json();
+    _hcSiteKey = c.hcaptchaSiteKey || '';
+  } catch { _hcSiteKey = ''; }
+  return _hcSiteKey;
+}
+
+// Render an hCaptcha widget into a container. Returns the widget id (used to read response token).
+function mountHCaptcha(container, sitekey) {
+  if (!window.hcaptcha || !sitekey) return null;
+  return window.hcaptcha.render(container, { sitekey, theme: 'light' });
+}
+
+// Reusable styled modal shell — returns the wrapper div with header + body slot.
+function buildHireModal(id, headerHtml, bodyHtml, accent = '#ffe066') {
+  let m = document.getElementById(id);
+  if (m) { m.style.display = 'block'; return null; }
+  m = document.createElement('div');
+  m.id = id;
+  m.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:200;background:#fffbea;border:2px solid ${accent};border-radius:14px;padding:0;color:#3E2418;font-family:'Space Grotesk',system-ui,sans-serif;min-width:440px;max-width:94vw;max-height:88vh;overflow-y:auto;box-shadow:0 0 60px rgba(0,0,0,0.4),0 0 40px ${accent}33;`;
+  m.innerHTML = `
+    <div style="background:${accent};color:#3E2418;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;align-items:center;gap:10px;font-family:'Permanent Marker',cursive;font-size:18px;">${headerHtml}</div>
+      <button class="hire-close" style="background:none;border:none;color:#3E2418;font-size:22px;cursor:pointer;font-weight:bold;">×</button>
+    </div>
+    <div style="padding:22px;">${bodyHtml}</div>
+  `;
+  document.body.appendChild(m);
+  m.querySelector('.hire-close').addEventListener('click', () => m.remove());
+  return m;
+}
+
+// Resume drop-box → opens resume.html in a new tab (visitor saves as PDF via Ctrl+P).
+function showResumeDownload() {
+  const m = buildHireModal('resumeModal',
+    '📄 Imran Pasha · Resume',
+    `<p style="font-size:13px;line-height:1.6;color:#3E2418;margin-bottom:14px;">Open my resume — print/save as PDF from your browser (<kbd style="background:#FFE066;border:1px solid #A55A28;padding:1px 6px;border-radius:3px;">Ctrl/Cmd + P</kbd>).</p>
+    <ul style="font-size:12px;line-height:1.7;color:#5a4030;padding-left:18px;">
+      <li>Full-stack engineer (MERN, GraphQL, Node, React)</li>
+      <li>Cybersecurity (Burp, Nmap, OWASP, TryHackMe top 15%)</li>
+      <li>DevOps (Docker, AWS, Caddy, GitHub Actions)</li>
+      <li>Available Q2 2026 — open to remote / contract / full-time</li>
+    </ul>
+    <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/resume.html" target="_blank" style="display:inline-block;padding:11px 22px;background:#FFB070;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;font-size:14px;font-family:'Permanent Marker',cursive;">📄 Open Resume → Save PDF</a>
+      <a href="mailto:imranpasha.ahmed@gmail.com?subject=Hi%20Imran%20-%20interested%20in%20your%20resume" style="display:inline-block;padding:11px 22px;background:transparent;color:#A55A28;border:2px solid #A55A28;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;">📧 Email me</a>
+    </div>`,
+    '#FFB070'
+  );
+}
+
+// Book-a-call → simple form, opens mailto with picked time pre-filled.
+function showBookCall() {
+  const m = buildHireModal('bookCallModal',
+    '📅 Book a 30-min intro call',
+    `<p style="font-size:13px;line-height:1.6;color:#3E2418;margin-bottom:14px;">Pick a slot below and I'll get a calendar invite to your inbox within 24 hrs. Free — no obligation.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+      <label>Your name <input id="bcName" type="text" placeholder="e.g. Sarah Chen" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;"></label>
+      <label>Your email <input id="bcEmail" type="email" placeholder="sarah@example.com" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;"></label>
+      <label>Preferred date <input id="bcDate" type="date" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;"></label>
+      <label>Preferred time
+        <select id="bcTime" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;">
+          <option>09:00 IST (Morning India / late evening US)</option>
+          <option>14:00 IST (Afternoon India / morning US East)</option>
+          <option>18:00 IST (Evening India / morning US Pacific)</option>
+          <option>21:00 IST (Late evening India / late morning US)</option>
+        </select>
+      </label>
+      <label>What you'd like to discuss
+        <textarea id="bcMsg" rows="3" placeholder="e.g. cloud security audit for our SaaS / full-stack contract / pen-test engagement" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:inherit;margin-top:4px;resize:vertical;"></textarea>
+      </label>
+      <div id="bcCaptcha" style="margin-top:8px;"></div>
+    </div>
+    <button id="bcSend" style="margin-top:14px;padding:12px;width:100%;background:#5ce5ff;color:#0a1426;border:none;border-radius:8px;font-weight:bold;font-size:15px;cursor:pointer;font-family:'Permanent Marker',cursive;">📧 Send booking request</button>
+    <div style="margin-top:8px;font-size:11px;color:#7a6050;text-align:center;">Sent direct to my inbox via your portfolio's <code>/api/contact</code> (Nodemailer + hCaptcha).</div>`,
+    '#5ce5ff'
+  );
+  if (!m) return;
+  // Mount hCaptcha widget if available
+  let bcCaptchaId = null;
+  getHcSiteKey().then(key => {
+    if (key) bcCaptchaId = mountHCaptcha(m.querySelector('#bcCaptcha'), key);
+  });
+  m.querySelector('#bcSend').addEventListener('click', async () => {
+    const name = m.querySelector('#bcName').value.trim();
+    const email = m.querySelector('#bcEmail').value.trim();
+    const date = m.querySelector('#bcDate').value || '(any day)';
+    const time = m.querySelector('#bcTime').value;
+    const msg  = m.querySelector('#bcMsg').value.trim();
+    if (!email || !msg) { setSendStatus(m, 'error', 'Email and message are required'); return; }
+    const captchaToken = (window.hcaptcha && bcCaptchaId !== null) ? window.hcaptcha.getResponse(bcCaptchaId) : '';
+    setSendStatus(m, 'sending');
+    try {
+      await sendContactRequest({
+        name, email, kind: '📅 Booking request',
+        message: `Preferred date: ${date}\nPreferred time: ${time}\n\n${msg}`,
+        captcha: captchaToken,
+      });
+      setSendStatus(m, 'success');
+    } catch (e) {
+      setSendStatus(m, 'error', e.message);
+      if (window.hcaptcha && bcCaptchaId !== null) window.hcaptcha.reset(bcCaptchaId);
+    }
+  });
+}
+
+// Hire packages → 3-tier pricing modal (Audit / Project / Retainer).
+function showHirePackages() {
+  buildHireModal('packagesModal',
+    '💼 Hire Imran — Packages',
+    `<p style="font-size:13px;line-height:1.6;color:#3E2418;margin-bottom:18px;">Three ways to work with me. All include a free 30-min scoping call up front (book one above).</p>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <!-- AUDIT -->
+      <div style="background:#fff;border:2px solid #ff6a3a;border-radius:10px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <div style="font-family:'Permanent Marker',cursive;color:#ff6a3a;font-size:18px;">🛡 SECURITY AUDIT</div>
+          <div style="font-weight:bold;color:#3E2418;font-size:13px;">from $X / day · 1 wk min</div>
+        </div>
+        <div style="font-size:12px;color:#5a4030;line-height:1.6;">Black-box pen-test, code review, cloud config review, OWASP Top 10 walk-through. Deliverable: written report + remediation backlog + 1 free retest.</div>
+        <div style="margin-top:8px;font-size:11px;color:#7a6050;">Best fit: SaaS pre-launch · compliance prep · post-incident</div>
+      </div>
+      <!-- PROJECT -->
+      <div style="background:#fff;border:2px solid #5ce5ff;border-radius:10px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <div style="font-family:'Permanent Marker',cursive;color:#5ce5ff;font-size:18px;">⚙ FIXED-PRICE PROJECT</div>
+          <div style="font-weight:bold;color:#3E2418;font-size:13px;">scoped · milestone-based</div>
+        </div>
+        <div style="font-size:12px;color:#5a4030;line-height:1.6;">Build out a feature, MVP, or backend service end-to-end. MERN / GraphQL / Node / React Native. Includes infra, deploy pipeline, and 30 days post-launch support.</div>
+        <div style="margin-top:8px;font-size:11px;color:#7a6050;">Best fit: greenfield MVP · v2 rebuild · API platform</div>
+      </div>
+      <!-- RETAINER -->
+      <div style="background:#fff;border:2px solid #9fef00;border-radius:10px;padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+          <div style="font-family:'Permanent Marker',cursive;color:#88cc14;font-size:18px;">🔁 MONTHLY RETAINER</div>
+          <div style="font-weight:bold;color:#3E2418;font-size:13px;">N hrs/week · 3-mo min</div>
+        </div>
+        <div style="font-size:12px;color:#5a4030;line-height:1.6;">On-call for both feature work AND security reviews. Slack-channel access. Weekly syncs. Pause anytime after month 3.</div>
+        <div style="margin-top:8px;font-size:11px;color:#7a6050;">Best fit: small teams without a security/devops lead · fractional CTO-lite</div>
+      </div>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+      <button id="pkgBook" style="padding:11px 22px;background:#FFB070;color:#fff;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;font-family:'Permanent Marker',cursive;">📅 Book a scoping call</button>
+      <a href="mailto:imranpasha.ahmed@gmail.com?subject=Pricing%20enquiry" style="display:inline-block;padding:11px 22px;background:transparent;color:#A55A28;border:2px solid #A55A28;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;">📧 Ask about pricing</a>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#7a6050;text-align:center;">Real numbers shared on the call — depends on scope, urgency, and stack.</div>`,
+    '#ffe066'
+  );
+  // Wire the "Book scoping call" button to chain into the booking modal
+  const pkg = document.getElementById('packagesModal');
+  if (pkg) {
+    pkg.querySelector('#pkgBook').addEventListener('click', () => {
+      pkg.remove();
+      showBookCall();
+    });
+  }
+}
+
+// Sticky HIRE IMRAN CTA — top-right pill, always visible. Click → opens contact form.
+(function setupHireCta() {
+  const pill = document.createElement('button');
+  pill.id = 'hireCta';
+  pill.innerHTML = '✨ Hire Imran';
+  pill.title = 'Open the hire form';
+  pill.addEventListener('click', () => {
+    if (window.imranSound) window.imranSound.click();
+    showHireContactForm();
+  });
+  document.body.appendChild(pill);
+})();
+function showHireContactForm() {
+  const m = buildHireModal('hireModal',
+    '✨ Hire me — quick contact',
+    `<p style="font-size:13px;line-height:1.6;color:#3E2418;margin-bottom:14px;">Drop a few details and I'll reply within 24 hrs. Or jump to the longer options →</p>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+      <label>Name <input id="hcName" type="text" placeholder="your name" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;"></label>
+      <label>Email <input id="hcEmail" type="email" placeholder="you@company.com" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;"></label>
+      <label>What do you need?
+        <select id="hcKind" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-top:4px;">
+          <option value="security audit">🛡 Security audit / pen-test</option>
+          <option value="full-stack project">⚙ Full-stack project / MVP build</option>
+          <option value="cloud / DevOps setup">☁ Cloud / DevOps setup</option>
+          <option value="ongoing retainer">🔁 Ongoing retainer / fractional dev</option>
+          <option value="other">📨 Something else</option>
+        </select>
+      </label>
+      <label>Brief context
+        <textarea id="hcMsg" rows="3" placeholder="What are you building? What's blocking you? Timeline / budget if known." style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:inherit;margin-top:4px;resize:vertical;"></textarea>
+      </label>
+      <div id="hcCaptcha" style="margin-top:8px;"></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button id="hcSend" style="flex:1;min-width:160px;padding:12px;background:#FFB070;color:#fff;border:none;border-radius:8px;font-weight:bold;font-size:14px;cursor:pointer;font-family:'Permanent Marker',cursive;">📧 Send message</button>
+      <button id="hcBook" style="flex:1;min-width:140px;padding:12px;background:transparent;color:#5ce5ff;border:2px solid #5ce5ff;border-radius:8px;font-weight:bold;font-size:13px;cursor:pointer;">📅 Or book a call</button>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:#7a6050;text-align:center;">Sent direct to Imran's inbox via <code>/api/contact</code> — no email client needed.</div>`,
+    '#FFB070'
+  );
+  if (!m) return;
+  let hcCaptchaId = null;
+  getHcSiteKey().then(key => {
+    if (key) hcCaptchaId = mountHCaptcha(m.querySelector('#hcCaptcha'), key);
+  });
+  m.querySelector('#hcSend').addEventListener('click', async () => {
+    const name = m.querySelector('#hcName').value.trim();
+    const email = m.querySelector('#hcEmail').value.trim();
+    const kind = m.querySelector('#hcKind').value;
+    const msg = m.querySelector('#hcMsg').value.trim();
+    if (!email || !msg) { setSendStatus(m, 'error', 'Email and a brief message are required'); return; }
+    const captchaToken = (window.hcaptcha && hcCaptchaId !== null) ? window.hcaptcha.getResponse(hcCaptchaId) : '';
+    setSendStatus(m, 'sending');
+    try {
+      await sendContactRequest({ name, email, kind: '✨ Hire enquiry — ' + kind, message: msg, captcha: captchaToken });
+      setSendStatus(m, 'success');
+    } catch (e) {
+      setSendStatus(m, 'error', e.message);
+      if (window.hcaptcha && hcCaptchaId !== null) window.hcaptcha.reset(hcCaptchaId);
+    }
+  });
+  m.querySelector('#hcBook').addEventListener('click', () => { m.remove(); showBookCall(); });
 }
 
 // ────────── MINIMAP (draw every ~100ms — checkpoints + car position) ──────────

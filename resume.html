@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imran Pasha — Full-stack Engineer + Cybersecurity</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    color: #1a1a1a; background: #f4f6f8; line-height: 1.55; padding: 32px 16px;
+  }
+  .page {
+    max-width: 820px; margin: 0 auto; background: #fff; padding: 48px 56px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08); border-radius: 6px;
+  }
+  header {
+    border-bottom: 3px solid #FF6A3A; padding-bottom: 18px; margin-bottom: 24px;
+    display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;
+  }
+  h1 { font-size: 32px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.02em; }
+  .tagline { font-size: 14px; color: #666; font-weight: 500; margin-top: 4px; }
+  .contact { font-size: 12px; color: #444; line-height: 1.85; text-align: right; font-family: 'JetBrains Mono', monospace; }
+  .contact a { color: #1a3a8c; text-decoration: none; }
+  .contact a:hover { text-decoration: underline; }
+  h2 {
+    font-size: 12px; font-weight: 700; color: #FF6A3A; text-transform: uppercase;
+    letter-spacing: 0.18em; margin: 28px 0 10px 0; padding-bottom: 4px; border-bottom: 1px solid #eee;
+  }
+  h3 { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-top: 12px; }
+  .role-meta { font-size: 12px; color: #666; font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  p, li { font-size: 13px; color: #333; }
+  ul { padding-left: 22px; margin-top: 4px; }
+  li { margin-bottom: 3px; }
+  .skills-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; margin-top: 6px; }
+  .skill-cat { font-size: 12px; }
+  .skill-cat b { color: #1a3a8c; display: block; margin-bottom: 2px; }
+  .summary {
+    background: #fef9f0; border-left: 4px solid #FFB070; padding: 12px 16px;
+    border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.65; color: #444;
+  }
+  .badge {
+    display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    background: #e8f4ff; color: #1a3a8c; font-family: 'JetBrains Mono', monospace; margin-left: 6px;
+  }
+  .project { margin-top: 12px; padding-bottom: 8px; border-bottom: 1px dashed #eee; }
+  .project:last-child { border-bottom: none; }
+  .project-name { font-weight: 600; color: #1a1a1a; }
+  .project-stack { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666; margin-top: 2px; }
+  .project-desc { font-size: 12px; color: #444; margin-top: 4px; }
+  footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #eee; font-size: 11px; color: #888; text-align: center; }
+  .print-hint {
+    background: #fff7e6; border: 1px solid #FFB070; padding: 10px 14px; border-radius: 6px;
+    font-size: 12px; color: #7a4a00; margin-bottom: 18px; text-align: center;
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; padding: 24px 32px; max-width: 100%; }
+    .print-hint { display: none; }
+  }
+  @media (max-width: 600px) {
+    .page { padding: 28px 22px; }
+    header { flex-direction: column; align-items: flex-start; }
+    .contact { text-align: left; }
+    .skills-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="print-hint">📄 Press <b>Ctrl/Cmd + P</b> → "Save as PDF" to download</div>
+
+  <header>
+    <div>
+      <h1>Imran Pasha</h1>
+      <div class="tagline">Full-stack engineer · Cybersecurity specialist · Bangalore, India</div>
+    </div>
+    <div class="contact">
+      📧 <a href="mailto:imranpasha.ahmed@gmail.com">imranpasha.ahmed@gmail.com</a><br>
+      🐙 <a href="https://github.com/Imranpasha30" target="_blank">github.com/Imranpasha30</a><br>
+      💼 <a href="https://www.linkedin.com/in/imran-pasha-019b2b213/" target="_blank">linkedin.com/in/imran-pasha-</a><br>
+      🔥 <a href="https://tryhackme.com/p/devilhost666" target="_blank">tryhackme.com/p/devilhost666</a> <span class="badge">top 15%</span>
+    </div>
+  </header>
+
+  <div class="summary">
+    Engineer who builds AND breaks. Ship full-stack web apps (MERN / GraphQL / Node / React) with security baked in from day one — pen-test before deploy, harden infra after. <b>Available Q2 2026</b> for remote / contract / full-time. Open to security audits, MVP builds, and ongoing retainers.
+  </div>
+
+  <h2>Skills</h2>
+  <div class="skills-grid">
+    <div class="skill-cat"><b>Frontend</b>React · Next.js · Redux · TailwindCSS · Three.js</div>
+    <div class="skill-cat"><b>Backend</b>Node.js · Express · GraphQL · REST · WebSocket</div>
+    <div class="skill-cat"><b>Databases</b>MongoDB · PostgreSQL · Redis · MySQL</div>
+    <div class="skill-cat"><b>DevOps</b>Docker · Caddy · GitHub Actions · AWS · Linux</div>
+    <div class="skill-cat"><b>Security</b>Burp Suite · Nmap · Metasploit · OWASP Top 10 · TryHackMe</div>
+    <div class="skill-cat"><b>Mobile</b>React Native · Android (Java/Kotlin)</div>
+    <div class="skill-cat"><b>Tools</b>Git · Vim · VSCode · Wireshark · Postman</div>
+    <div class="skill-cat"><b>Languages</b>JavaScript · TypeScript · Python · C / C++ · Java</div>
+  </div>
+
+  <h2>Selected Projects</h2>
+
+  <div class="project">
+    <div class="project-name">Interactive 3D Portfolio <span class="badge">live</span></div>
+    <div class="project-stack">Three.js · Cannon.js · Node.js · WebSocket · Caddy · Docker · GitHub Actions</div>
+    <div class="project-desc">A drivable Bruno-Simon-style 3D city showcasing my work. Live multiplayer (ghost cars), AI chatbot (Gemini), real-time observability dashboard pulled from the very server visitors are connected to, 5 interactive cybersecurity demos (SQLi, phishing, port scan, cloud misconfig, TLS), procedural mountain ring + airport + harbour. Auto-deployed to EC2 on every push.</div>
+  </div>
+
+  <div class="project">
+    <div class="project-name">Map_OJ — competitive-programming online judge</div>
+    <div class="project-stack">MERN · Docker sandbox · WebSocket · GraphQL</div>
+    <div class="project-desc">Multi-language code judge with sandboxed execution, live submission verdicts, and contest mode. Built the entire stack including the Docker runtime isolation for untrusted code.</div>
+  </div>
+
+  <div class="project">
+    <div class="project-name">ChatZ — real-time messaging app</div>
+    <div class="project-stack">React · Node · Socket.io · MongoDB · JWT</div>
+    <div class="project-desc">End-to-end messaging app with typing indicators, read receipts, encrypted channels, file sharing.</div>
+  </div>
+
+  <div class="project">
+    <div class="project-name">Logistics + Travellers</div>
+    <div class="project-stack">MERN · GraphQL · Stripe · Maps API</div>
+    <div class="project-desc">Two production MERN stacks — a logistics tracker with route optimization and a travel-booking platform with Stripe checkout.</div>
+  </div>
+
+  <h2>Cybersecurity practice</h2>
+  <ul>
+    <li><b>TryHackMe</b> — top 15% rank, 49 rooms completed, 9 badges (<a href="https://tryhackme.com/p/devilhost666" target="_blank">@devilhost666</a>)</li>
+    <li><b>OWASP Top 10</b> — built and broken in real codebases (SQLi, XSS, IDOR, SSRF, deserialization, CSRF)</li>
+    <li><b>Burp Suite</b> — manual + automated web app pen-testing</li>
+    <li><b>Nmap / Metasploit</b> — network reconnaissance + post-exploitation</li>
+    <li><b>Linux internals</b> — comfortable in containers, kernel namespaces, fail2ban / WireGuard / ssh hardening</li>
+  </ul>
+
+  <h2>What I help organizations with</h2>
+  <ul>
+    <li><b>Security audit</b> — pen-test, code review, cloud config review (1-week minimum, written report + retest)</li>
+    <li><b>Full-stack project</b> — MVP builds, feature contracts, v2 rebuilds, post-launch support</li>
+    <li><b>Cloud / DevOps setup</b> — Caddy + Docker + CI/CD, IAM hardening, secrets management</li>
+    <li><b>Monthly retainer</b> — fractional dev/security on Slack for small teams</li>
+  </ul>
+
+  <footer>
+    Generated from imran's portfolio · <a href="mailto:imranpasha.ahmed@gmail.com">imranpasha.ahmed@gmail.com</a> · Available Q2 2026
+  </footer>
+</div>
+</body>
+</html>

@@ -75,9 +75,17 @@ jobs:
           GHCR_IMAGE: ${{ steps.img.outputs.name }}:latest
           GHCR_USER: ${{ github.actor }}
           GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
+          # Contact form secrets (Nodemailer + hCaptcha)
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          HCAPTCHA_SITE_KEY: ${{ secrets.HCAPTCHA_SITE_KEY }}
+          HCAPTCHA_SECRET: ${{ secrets.HCAPTCHA_SECRET }}
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "GEMINI_KEY='$GEMINI_KEY' GHCR_IMAGE='$GHCR_IMAGE' GHCR_USER='$GHCR_USER' GHCR_PAT='$GHCR_PAT' bash -s" <<'REMOTE_SCRIPT'
+            "GEMINI_KEY='$GEMINI_KEY' GHCR_IMAGE='$GHCR_IMAGE' GHCR_USER='$GHCR_USER' GHCR_PAT='$GHCR_PAT' \
+             GMAIL_USER='$GMAIL_USER' GMAIL_APP_PASSWORD='$GMAIL_APP_PASSWORD' \
+             HCAPTCHA_SITE_KEY='$HCAPTCHA_SITE_KEY' HCAPTCHA_SECRET='$HCAPTCHA_SECRET' \
+             bash -s" <<'REMOTE_SCRIPT'
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
 
@@ -109,6 +117,10 @@ jobs:
           cat > .env <<ENVEOF
           GHCR_IMAGE=${GHCR_IMAGE}
           GEMINI_KEY=${GEMINI_KEY}
+          GMAIL_USER=${GMAIL_USER}
+          GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+          HCAPTCHA_SITE_KEY=${HCAPTCHA_SITE_KEY}
+          HCAPTCHA_SECRET=${HCAPTCHA_SECRET}
           ENVEOF
           chmod 600 .env
 
